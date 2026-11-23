@@ -9,8 +9,8 @@ window.CONFIG = {
   intro:
     "Construyo tableros de Power BI de punta a punta: desde la consulta en Databricks hasta el modelo semántico y el diseño del reporte. Mi foco es la retención de clientes, el análisis de churn y la operación comercial en telecomunicaciones.",
   github: "https://github.com/EstebanMunoz3264/dashboards",
-  linkedin: "",          // ej: "https://www.linkedin.com/in/tu-usuario"
-  email: "",             // ej: "tucorreo@gmail.com"
+  linkedin: "https://www.linkedin.com/in/esteban-muñoz",
+  email: "esteban_3264@hotmail.com",
   cv: "",                // ej: "assets/CV_Esteban_Munoz.pdf"
 
   experiencia: [
