@@ -1,0 +1,552 @@
+-- Total Tickets  ·  tabla _Medidas
+Total Tickets =
+COUNTROWS(result)
+
+-- Bien Tipificados  ·  tabla _Medidas
+Bien Tipificados =
+COUNTROWS(FILTER(result, result[Coherencia_Final] = "COHERENTE"))
+
+-- Mal Tipificados  ·  tabla _Medidas
+Mal Tipificados =
+COUNTROWS(FILTER(result, result[Coherencia_Final] = "INCOHERENTE"))
+
+-- % Correcto  ·  tabla _Medidas
+% Correcto =
+IF(NOT ISBLANK([Total Tickets]), DIVIDE(COALESCE([Bien Tipificados], 0), [Total Tickets], 0))
+
+-- % Error  ·  tabla _Medidas
+% Error =
+IF(NOT ISBLANK([Total Tickets]), DIVIDE(COALESCE([Mal Tipificados], 0), [Total Tickets], 0))
+
+-- % Error Mes Anterior  ·  tabla _Medidas
+% Error Mes Anterior =
+CALCULATE([% Error], DATEADD(Calendar[Date], -1, MONTH))
+
+-- Variación % Error vs Mes Anterior  ·  tabla _Medidas
+Variación % Error vs Mes Anterior =
+VAR errorAnt = [% Error Mes Anterior]
+RETURN
+IF(ISBLANK(errorAnt), BLANK(), [% Error] - errorAnt)
+
+-- Ranking Agente % Error  ·  tabla _Medidas
+Ranking Agente % Error =
+IF(
+    [Total Tickets] >= 15,
+    RANKX(
+        FILTER(
+            ALLSELECTED(result[Agent], result[Nombre Agente]),
+            CALCULATE([Total Tickets]) >= 15
+        ),
+        [% Error],
+        ,
+        DESC,
+        Skip
+    ),
+    BLANK()
+)
+
+-- Tickets con Min 15  ·  tabla _Medidas
+Tickets con Min 15 =
+IF([Total Tickets] >= 15, [Total Tickets], BLANK())
+
+-- HTML Total Tickets  ·  tabla _Medidas
+HTML Total Tickets =
+VAR v = [Total Tickets]
+VAR ant = [Total Tickets Mes Anterior]
+VAR fmt = FORMAT(v, "#,##0")
+VAR varPct = DIVIDE(v - ant, ant)
+VAR hayAnt = NOT ISBLANK(ant) && ant > 0
+VAR txtVar = IF(hayAnt, IF(varPct >= 0, "+", "−") & FORMAT(ABS(varPct), "0.0%") & " vs mes anterior", "Sin datos del mes anterior")
+VAR colTxt = IF(hayAnt, "#185FA5", "#888")
+VAR colBg = IF(hayAnt, "#EBF3FB", "#F1EFE8")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:14px 16px;background:#fff;border:1px solid #e8e8e8;border-left:3px solid #185FA5;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  "<div style='display:flex;align-items:center;gap:6px;margin-bottom:8px'>" &
+    "<div style='width:24px;height:24px;border-radius:6px;background:#EBF3FB;display:flex;align-items:center;justify-content:center'>" &
+      "<svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='#185FA5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='16' rx='2'/><line x1='3' y1='9' x2='21' y2='9'/></svg>" &
+    "</div>" &
+    "<span style='font-size:14px;color:#000'>Total tickets</span>" &
+  "</div>" &
+  "<div style='font-size:22px;font-weight:600;color:#1a1a1a;line-height:1;letter-spacing:-0.3px;margin-bottom:6px'>" & fmt & "</div>" &
+  "<div style='display:inline-flex;align-items:center;background:" & colBg & ";color:" & colTxt & ";font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px'>" & txtVar & "</div>" &
+"</div>"
+
+-- HTML Bien Tipificados  ·  tabla _Medidas
+HTML Bien Tipificados =
+VAR v = [Bien Tipificados]
+VAR pct = FORMAT([% Correcto], "0.0%")
+VAR fmt = FORMAT(v, "#,##0")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:14px 16px;background:#fff;border:1px solid #e8e8e8;border-left:3px solid #3B6D11;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  "<div style='display:flex;align-items:center;gap:6px;margin-bottom:8px'>" &
+    "<div style='width:24px;height:24px;border-radius:6px;background:#EAF3DE;display:flex;align-items:center;justify-content:center'>" &
+      "<svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='#3B6D11' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>" &
+    "</div>" &
+    "<span style='font-size:14px;color:#000'>Bien tipificados</span>" &
+  "</div>" &
+  "<div style='font-size:22px;font-weight:600;color:#27500A;line-height:1;letter-spacing:-0.3px;margin-bottom:6px'>" & fmt & "</div>" &
+  "<div style='display:inline-flex;align-items:center;gap:4px;background:#EAF3DE;color:#27500A;font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px'>" &
+    "<svg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='#27500A' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>" &
+    pct & " del total" &
+  "</div>" &
+"</div>"
+
+-- HTML Mal Tipificados  ·  tabla _Medidas
+HTML Mal Tipificados =
+VAR v = [Mal Tipificados]
+VAR pct = FORMAT([% Error], "0.0%")
+VAR fmt = FORMAT(v, "#,##0")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:14px 16px;background:#fff;border:1px solid #e8e8e8;border-left:3px solid #A32D2D;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  "<div style='display:flex;align-items:center;gap:6px;margin-bottom:8px'>" &
+    "<div style='width:24px;height:24px;border-radius:6px;background:#FCEBEB;display:flex;align-items:center;justify-content:center'>" &
+      "<svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='#A32D2D' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg>" &
+    "</div>" &
+    "<span style='font-size:14px;color:#000'>Mal tipificados</span>" &
+  "</div>" &
+  "<div style='font-size:22px;font-weight:600;color:#791F1F;line-height:1;letter-spacing:-0.3px;margin-bottom:6px'>" & fmt & "</div>" &
+  "<div style='display:inline-flex;align-items:center;gap:4px;background:#FCEBEB;color:#791F1F;font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px'>" &
+    "<svg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='#791F1F' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><line x1='5' y1='12' x2='19' y2='12'/><polyline points='12 5 19 12 12 19'/></svg>" &
+    pct & " del total" &
+  "</div>" &
+"</div>"
+
+-- HTML Variación Error  ·  tabla _Medidas
+HTML Variación Error =
+VAR variacion = [Variación % Error vs Mes Anterior]
+VAR hayDatos = NOT ISBLANK([Total Tickets])
+VAR fmt = IF(ISBLANK(variacion) || NOT hayDatos, "–", FORMAT(ABS(variacion) * 100, "0.0") & "pp")
+VAR esBaja = NOT ISBLANK(variacion) && variacion < 0
+VAR esSube = NOT ISBLANK(variacion) && variacion > 0
+VAR colorBorde = IF(esBaja, "#3B6D11", IF(esSube, "#A32D2D", "#888"))
+VAR colorTexto = IF(esBaja, "#27500A", IF(esSube, "#791F1F", "#444"))
+VAR colorFondo = IF(esBaja, "#EAF3DE", IF(esSube, "#FCEBEB", "#F1EFE8"))
+VAR signo = IF(esBaja, "−", IF(esSube, "+", ""))
+VAR etiqueta = IF(ISBLANK(variacion) || NOT hayDatos, "Sin datos del mes anterior", IF(esBaja, "Error bajó — mejora", IF(esSube, "Error subió — alerta", "Sin cambio")))
+VAR iconoPath = IF(esBaja,
+  "<polyline points='23 18 13.5 8.5 8.5 13.5 1 6'/><polyline points='17 18 23 18 23 12'/>",
+  IF(esSube,
+    "<polyline points='23 6 13.5 15.5 8.5 10.5 1 18'/><polyline points='17 6 23 6 23 12'/>",
+    "<line x1='5' y1='12' x2='19' y2='12'/>"
+  )
+)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:14px 16px;background:#fff;border:1px solid #e8e8e8;border-left:3px solid " & colorBorde & ";border-radius:12px;height:100%;box-sizing:border-box'>" &
+  "<div style='display:flex;align-items:center;gap:6px;margin-bottom:8px'>" &
+    "<div style='width:24px;height:24px;border-radius:6px;background:" & colorFondo & ";display:flex;align-items:center;justify-content:center'>" &
+      "<svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='" & colorBorde & "' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" & iconoPath & "</svg>" &
+    "</div>" &
+    "<span style='font-size:14px;color:#000'>Variación vs mes anterior</span>" &
+  "</div>" &
+  "<div style='font-size:22px;font-weight:600;color:" & colorTexto & ";line-height:1;letter-spacing:-0.3px;margin-bottom:6px'>" & signo & fmt & "</div>" &
+  "<div style='display:inline-flex;align-items:center;gap:4px;background:" & colorFondo & ";color:" & colorTexto & ";font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px'>" &
+    etiqueta &
+  "</div>" &
+"</div>"
+
+-- HTML Canal Agencia  ·  tabla _Medidas
+HTML Canal Agencia =
+VAR total = [Total Tickets Agencia]
+VAR bien  = CALCULATE([Bien Tipificados], result[Canal_1] = "Agencia")
+VAR mal   = [Mal Tipificados Agencia]
+VAR pctB  = DIVIDE(bien, total, 0)
+VAR pctM  = DIVIDE(mal,  total, 0)
+VAR fmtT  = FORMAT(total, "#,##0")
+VAR fmtB  = FORMAT(pctB, "0.0%")
+VAR fmtM  = FORMAT(pctM, "0.0%")
+VAR wB    = FORMAT(pctB * 100, "0") & "%"
+VAR wM    = FORMAT(pctM * 100, "0") & "%"
+RETURN
+IF(ISBLANK(total), "<div style='font-family:Segoe UI,sans-serif;padding:20px;color:#888'>Sin datos</div>",
+"<div style='font-family:Segoe UI,sans-serif;padding:20px 22px;background:#fff;border:1px solid #e8e8e8;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  "<div style='display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px'>" &
+    "<span style='font-size:15px;font-weight:600;color:#1a1a1a'>Agencia</span>" &
+    "<span style='font-size:12px;color:#000'>" & fmtT & " tickets</span>" &
+  "</div>" &
+  "<div style='margin-bottom:12px'>" &
+    "<div style='display:flex;align-items:center;gap:10px;margin-bottom:8px'>" &
+      "<span style='font-size:12px;color:#000;width:58px;text-align:right;flex-shrink:0'>Bien tip.</span>" &
+      "<div style='flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden'>" &
+        "<div style='height:100%;width:" & wB & ";background:#37173C;border-radius:4px'></div>" &
+      "</div>" &
+      "<span style='font-size:12px;font-weight:500;color:#37173C;width:40px;text-align:right'>" & fmtB & "</span>" &
+    "</div>" &
+    "<div style='display:flex;align-items:center;gap:10px'>" &
+      "<span style='font-size:12px;color:#000;width:58px;text-align:right;flex-shrink:0'>Mal tip.</span>" &
+      "<div style='flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden'>" &
+        "<div style='height:100%;width:" & wM & ";background:#9F62B0;border-radius:4px'></div>" &
+      "</div>" &
+      "<span style='font-size:12px;font-weight:500;color:#9F62B0;width:40px;text-align:right'>" & fmtM & "</span>" &
+    "</div>" &
+  "</div>" &
+"</div>")
+
+-- HTML Canal CallCenter  ·  tabla _Medidas
+HTML Canal CallCenter =
+VAR total = [Total Tickets CallCenter]
+VAR bien  = CALCULATE([Bien Tipificados], result[Canal_1] = "CallCenter")
+VAR mal   = [Mal Tipificados CallCenter]
+VAR pctB  = DIVIDE(bien, total, 0)
+VAR pctM  = DIVIDE(mal,  total, 0)
+VAR fmtT  = FORMAT(total, "#,##0")
+VAR fmtB  = FORMAT(pctB, "0.0%")
+VAR fmtM  = FORMAT(pctM, "0.0%")
+VAR wB    = FORMAT(pctB * 100, "0") & "%"
+VAR wM    = FORMAT(pctM * 100, "0") & "%"
+RETURN
+IF(ISBLANK(total), "<div style='font-family:Segoe UI,sans-serif;padding:20px;color:#888'>Sin datos</div>",
+"<div style='font-family:Segoe UI,sans-serif;padding:20px 22px;background:#fff;border:1px solid #e8e8e8;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  "<div style='display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px'>" &
+    "<span style='font-size:15px;font-weight:600;color:#1a1a1a'>Call center</span>" &
+    "<span style='font-size:12px;color:#000'>" & fmtT & " tickets</span>" &
+  "</div>" &
+  "<div style='margin-bottom:12px'>" &
+    "<div style='display:flex;align-items:center;gap:10px;margin-bottom:8px'>" &
+      "<span style='font-size:12px;color:#000;width:58px;text-align:right;flex-shrink:0'>Bien tip.</span>" &
+      "<div style='flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden'>" &
+        "<div style='height:100%;width:" & wB & ";background:#37173C;border-radius:4px'></div>" &
+      "</div>" &
+      "<span style='font-size:12px;font-weight:500;color:#37173C;width:40px;text-align:right'>" & fmtB & "</span>" &
+    "</div>" &
+    "<div style='display:flex;align-items:center;gap:10px'>" &
+      "<span style='font-size:12px;color:#000;width:58px;text-align:right;flex-shrink:0'>Mal tip.</span>" &
+      "<div style='flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden'>" &
+        "<div style='height:100%;width:" & wM & ";background:#9F62B0;border-radius:4px'></div>" &
+      "</div>" &
+      "<span style='font-size:12px;font-weight:500;color:#9F62B0;width:40px;text-align:right'>" & fmtM & "</span>" &
+    "</div>" &
+  "</div>" &
+"</div>")
+
+-- % Error Agencia  ·  tabla _Medidas
+% Error Agencia =
+CALCULATE([% Error], result[Canal_1] = "Agencia")
+
+-- % Error CallCenter  ·  tabla _Medidas
+% Error CallCenter =
+CALCULATE([% Error], result[Canal_1] = "CallCenter")
+
+-- Total Tickets Agencia  ·  tabla _Medidas
+Total Tickets Agencia =
+CALCULATE([Total Tickets], result[Canal_1] = "Agencia")
+
+-- Mal Tipificados Agencia  ·  tabla _Medidas
+Mal Tipificados Agencia =
+CALCULATE([Mal Tipificados], result[Canal_1] = "Agencia")
+
+-- Total Tickets CallCenter  ·  tabla _Medidas
+Total Tickets CallCenter =
+CALCULATE([Total Tickets], result[Canal_1] = "CallCenter")
+
+-- Mal Tipificados CallCenter  ·  tabla _Medidas
+Mal Tipificados CallCenter =
+CALCULATE([Mal Tipificados], result[Canal_1] = "CallCenter")
+
+-- Valor Resumen Cruce  ·  tabla _Medidas
+Valor Resumen Cruce =
+SUM(Matriz_Resumen_Cruce[Valor])
+
+-- Total Tickets Mes Anterior  ·  tabla _Medidas
+Total Tickets Mes Anterior =
+CALCULATE([Total Tickets], DATEADD(Calendar[Date], -1, MONTH))
+
+-- Color % Error  ·  tabla _Medidas
+Color % Error =
+VAR e = [% Error]
+RETURN
+    SWITCH(TRUE(),
+        ISBLANK(e), BLANK(),
+        e < 0.15, "#B59AC0",
+        e < 0.25, "#9F62B0",
+        "#37173C"
+    )
+
+-- Color % Error Agencia  ·  tabla _Medidas
+Color % Error Agencia =
+VAR e = [% Error Agencia]
+RETURN
+    SWITCH(TRUE(),
+        ISBLANK(e), BLANK(),
+        e < 0.15, "#B59AC0",
+        e < 0.25, "#9F62B0",
+        "#37173C"
+    )
+
+-- Color % Error CallCenter  ·  tabla _Medidas
+Color % Error CallCenter =
+VAR e = [% Error CallCenter]
+RETURN
+    SWITCH(TRUE(),
+        ISBLANK(e), BLANK(),
+        e < 0.15, "#B59AC0",
+        e < 0.25, "#9F62B0",
+        "#37173C"
+    )
+
+-- Casos Fuga Interacciones  ·  tabla _Medidas
+Casos Fuga Interacciones =
+CALCULATE(COUNTROWS(detalle_interacciones_deserciones), KEEPFILTERS(detalle_interacciones_deserciones[en_flujos] = "SI"), KEEPFILTERS(detalle_interacciones_deserciones[en_retenciones] = "NO"))
+
+-- Base Fuga Interacciones  ·  tabla _Medidas
+Base Fuga Interacciones =
+COUNTROWS(detalle_interacciones_deserciones)
+
+-- HTML Fuga Interacciones  ·  tabla _Medidas
+HTML Fuga Interacciones =
+VAR _casos = [Casos Fuga Interacciones]
+VAR _base = [Base Fuga Interacciones]
+VAR _pct = DIVIDE(_casos, _base)
+VAR _unMes = HASONEVALUE(Calendar[YearMonth])
+VAR _ant = IF(_unMes, CALCULATE([Casos Fuga Interacciones], DATEADD(Calendar[Date], -1, MONTH)))
+VAR _var = DIVIDE(_casos - _ant, _ant)
+VAR _hayAnt = _unMes && NOT ISBLANK(_ant) && _ant > 0
+VAR _txtVar =
+    IF(_hayAnt,
+        IF(_var >= 0, "▲ ", "▼ ") & FORMAT(ABS(_var), "0%") & " vs mes anterior (" & FORMAT(_ant, "#,##0") & ")",
+        IF(_unMes, "Sin datos del mes anterior", "Selecciona un mes para comparar con el anterior"))
+VAR _colVar = IF(_hayAnt && _var > 0, "#37173C", "#8A8090")
+VAR _pesoVar = IF(_hayAnt && _var > 0, "600", "400")
+VAR _agentes =
+    FILTER(
+        ADDCOLUMNS(VALUES(detalle_interacciones_deserciones[Agente]),
+            "_n", [Casos Fuga Interacciones],
+            "_ag", CALCULATE(MAX(detalle_interacciones_deserciones[Agencia (Usuarios)]))),
+        [_n] > 0)
+VAR _nAg = COUNTROWS(_agentes)
+VAR _top = TOPN(10, _agentes, [_n], DESC, detalle_interacciones_deserciones[Agente], ASC)
+VAR _max = MAXX(_top, [_n])
+VAR _sumTop = SUMX(_top, [_n])
+VAR _filas =
+    CONCATENATEX(_top,
+        "<div style='display:flex;align-items:center;gap:10px;margin:0 0 7px 0'>" &
+          "<div style='width:200px;flex-shrink:0;overflow:hidden'>" &
+            "<div style='font-size:12px;font-weight:500;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & detalle_interacciones_deserciones[Agente] & "</div>" &
+            "<div style='font-size:10px;color:#8A8090;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & IF(ISBLANK([_ag]) || [_ag] = "", "&nbsp;", [_ag]) & "</div>" &
+          "</div>" &
+          "<div style='flex:1;height:10px;background:#F0EAF2;border-radius:5px;overflow:hidden'>" &
+            "<div style='height:100%;width:" & FORMAT(DIVIDE([_n], _max) * 100, "0") & "%;background:#37173C;border-radius:5px'></div>" &
+          "</div>" &
+          "<div style='width:90px;flex-shrink:0;text-align:right;font-size:12px;color:#1a1a1a'><b>" & FORMAT([_n], "#,##0") & "</b> <span style='color:#8A8090'>· " & FORMAT(DIVIDE([_n], _casos), "0%") & "</span></div>" &
+        "</div>",
+        "", [_n], DESC, detalle_interacciones_deserciones[Agente], ASC)
+VAR _pie =
+    IF(_nAg > 10,
+        "Top 10 de " & FORMAT(_nAg, "#,##0") & " agentes · concentran el " & FORMAT(DIVIDE(_sumTop, _casos), "0%") & " de los casos",
+        FORMAT(_nAg, "#,##0") & " agentes con casos")
+VAR _cab =
+    "<div style='font-size:14px;font-weight:600;color:#37173C;margin-bottom:2px'>Interacciones sin ticket de retención y con flujo de cancelación</div>" &
+    "<div style='font-size:11px;color:#8A8090;margin-bottom:12px'>Llamaron para desertar, no pasaron a retención y ya tienen flujo de baja en Tytan</div>"
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:16px 18px;background:#fff;border:1px solid #e8e8e8;border-top:4px solid #37173C;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  _cab &
+  IF(ISBLANK(_casos) || _casos = 0,
+    "<div style='font-size:13px;color:#8A8090;padding:24px 0'>Sin casos en el periodo seleccionado</div>",
+    "<div style='display:flex;align-items:baseline;gap:12px;margin-bottom:4px'>" &
+      "<span style='font-size:28px;font-weight:600;color:#1a1a1a;line-height:1'>" & FORMAT(_casos, "#,##0") & "</span>" &
+      "<span style='font-size:12px;color:#37173C;background:#F0EAF2;padding:2px 8px;border-radius:20px'>" & FORMAT(_pct, "0.0%") & " de las interacciones de deserción</span>" &
+    "</div>" &
+    "<div style='font-size:11px;font-weight:" & _pesoVar & ";color:" & _colVar & ";margin-bottom:14px'>" & _txtVar & "</div>" &
+    "<div style='border-top:1px solid #F0EAF2;padding-top:12px'>" & _filas & "</div>" &
+    "<div style='font-size:10px;color:#8A8090;margin-top:6px'>" & _pie & "</div>") &
+"</div>"
+
+-- Casos Fuga Flujos  ·  tabla _Medidas
+Casos Fuga Flujos =
+CALCULATE(COUNTROWS(detalle_flujos_deserciones), KEEPFILTERS(detalle_flujos_deserciones[en_retencion] = "NO"))
+
+-- Base Fuga Flujos  ·  tabla _Medidas
+Base Fuga Flujos =
+COUNTROWS(detalle_flujos_deserciones)
+
+-- HTML Fuga Flujos  ·  tabla _Medidas
+HTML Fuga Flujos =
+VAR _casos = [Casos Fuga Flujos]
+VAR _base = [Base Fuga Flujos]
+VAR _pct = DIVIDE(_casos, _base)
+VAR _unMes = HASONEVALUE(Calendar[YearMonth])
+VAR _ant = IF(_unMes, CALCULATE([Casos Fuga Flujos], DATEADD(Calendar[Date], -1, MONTH)))
+VAR _var = DIVIDE(_casos - _ant, _ant)
+VAR _hayAnt = _unMes && NOT ISBLANK(_ant) && _ant > 0
+VAR _txtVar =
+    IF(_hayAnt,
+        IF(_var >= 0, "▲ ", "▼ ") & FORMAT(ABS(_var), "0%") & " vs mes anterior (" & FORMAT(_ant, "#,##0") & ")",
+        IF(_unMes, "Sin datos del mes anterior", "Selecciona un mes para comparar con el anterior"))
+VAR _colVar = IF(_hayAnt && _var > 0, "#37173C", "#8A8090")
+VAR _pesoVar = IF(_hayAnt && _var > 0, "600", "400")
+VAR _agentes =
+    FILTER(
+        ADDCOLUMNS(VALUES(detalle_flujos_deserciones[Agente]),
+            "_n", [Casos Fuga Flujos],
+            "_ag", CALCULATE(MAX(detalle_flujos_deserciones[Agencia (Usuarios)]))),
+        [_n] > 0)
+VAR _nAg = COUNTROWS(_agentes)
+VAR _top = TOPN(10, _agentes, [_n], DESC, detalle_flujos_deserciones[Agente], ASC)
+VAR _max = MAXX(_top, [_n])
+VAR _sumTop = SUMX(_top, [_n])
+VAR _filas =
+    CONCATENATEX(_top,
+        "<div style='display:flex;align-items:center;gap:10px;margin:0 0 7px 0'>" &
+          "<div style='width:200px;flex-shrink:0;overflow:hidden'>" &
+            "<div style='font-size:12px;font-weight:500;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & detalle_flujos_deserciones[Agente] & "</div>" &
+            "<div style='font-size:10px;color:#8A8090;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & IF(ISBLANK([_ag]) || [_ag] = "", "&nbsp;", [_ag]) & "</div>" &
+          "</div>" &
+          "<div style='flex:1;height:10px;background:#F0EAF2;border-radius:5px;overflow:hidden'>" &
+            "<div style='height:100%;width:" & FORMAT(DIVIDE([_n], _max) * 100, "0") & "%;background:#37173C;border-radius:5px'></div>" &
+          "</div>" &
+          "<div style='width:90px;flex-shrink:0;text-align:right;font-size:12px;color:#1a1a1a'><b>" & FORMAT([_n], "#,##0") & "</b> <span style='color:#8A8090'>· " & FORMAT(DIVIDE([_n], _casos), "0%") & "</span></div>" &
+        "</div>",
+        "", [_n], DESC, detalle_flujos_deserciones[Agente], ASC)
+VAR _pie =
+    IF(_nAg > 10,
+        "Top 10 de " & FORMAT(_nAg, "#,##0") & " agentes · concentran el " & FORMAT(DIVIDE(_sumTop, _casos), "0%") & " de los casos",
+        FORMAT(_nAg, "#,##0") & " agentes con casos")
+VAR _cab =
+    "<div style='font-size:14px;font-weight:600;color:#37173C;margin-bottom:2px'>Flujos de cancelación sin ticket de retención</div>" &
+    "<div style='font-size:11px;color:#8A8090;margin-bottom:12px'>Bajas procesadas en Tytan sin ningún ticket de retención registrado</div>"
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:16px 18px;background:#fff;border:1px solid #e8e8e8;border-top:4px solid #37173C;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  _cab &
+  IF(ISBLANK(_casos) || _casos = 0,
+    "<div style='font-size:13px;color:#8A8090;padding:24px 0'>Sin casos en el periodo seleccionado</div>",
+    "<div style='display:flex;align-items:baseline;gap:12px;margin-bottom:4px'>" &
+      "<span style='font-size:28px;font-weight:600;color:#1a1a1a;line-height:1'>" & FORMAT(_casos, "#,##0") & "</span>" &
+      "<span style='font-size:12px;color:#37173C;background:#F0EAF2;padding:2px 8px;border-radius:20px'>" & FORMAT(_pct, "0.0%") & " de los flujos de cancelación</span>" &
+    "</div>" &
+    "<div style='font-size:11px;font-weight:" & _pesoVar & ";color:" & _colVar & ";margin-bottom:14px'>" & _txtVar & "</div>" &
+    "<div style='border-top:1px solid #F0EAF2;padding-top:12px'>" & _filas & "</div>" &
+    "<div style='font-size:10px;color:#8A8090;margin-top:6px'>" & _pie & "</div>") &
+"</div>"
+
+-- Casos Retenidos con Flujo  ·  tabla _Medidas
+Casos Retenidos con Flujo =
+CALCULATE(COUNTROWS(detalle_retenciones_deserciones), KEEPFILTERS(detalle_retenciones_deserciones[escenario_auditoria] = "RETENIDO CON FLUJO - INCONSISTENTE"))
+
+-- Base Retenidos con Flujo  ·  tabla _Medidas
+Base Retenidos con Flujo =
+CALCULATE(COUNTROWS(detalle_retenciones_deserciones), KEEPFILTERS(detalle_retenciones_deserciones[Retencion] IN {"SI", "SI CRM"}))
+
+-- HTML Retenidos con Flujo  ·  tabla _Medidas
+HTML Retenidos con Flujo =
+VAR _casos = [Casos Retenidos con Flujo]
+VAR _base = [Base Retenidos con Flujo]
+VAR _pct = DIVIDE(_casos, _base)
+VAR _unMes = HASONEVALUE(Calendar[YearMonth])
+VAR _ant = IF(_unMes, CALCULATE([Casos Retenidos con Flujo], DATEADD(Calendar[Date], -1, MONTH)))
+VAR _var = DIVIDE(_casos - _ant, _ant)
+VAR _hayAnt = _unMes && NOT ISBLANK(_ant) && _ant > 0
+VAR _txtVar =
+    IF(_hayAnt,
+        IF(_var >= 0, "▲ ", "▼ ") & FORMAT(ABS(_var), "0%") & " vs mes anterior (" & FORMAT(_ant, "#,##0") & ")",
+        IF(_unMes, "Sin datos del mes anterior", "Selecciona un mes para comparar con el anterior"))
+VAR _colVar = IF(_hayAnt && _var > 0, "#37173C", "#8A8090")
+VAR _pesoVar = IF(_hayAnt && _var > 0, "600", "400")
+VAR _agentes =
+    FILTER(
+        ADDCOLUMNS(VALUES(detalle_retenciones_deserciones[Agente]),
+            "_n", [Casos Retenidos con Flujo],
+            "_ag", CALCULATE(MAX(detalle_retenciones_deserciones[Agencia (Usuarios)]))),
+        [_n] > 0)
+VAR _nAg = COUNTROWS(_agentes)
+VAR _top = TOPN(10, _agentes, [_n], DESC, detalle_retenciones_deserciones[Agente], ASC)
+VAR _max = MAXX(_top, [_n])
+VAR _sumTop = SUMX(_top, [_n])
+VAR _filas =
+    CONCATENATEX(_top,
+        "<div style='display:flex;align-items:center;gap:10px;margin:0 0 7px 0'>" &
+          "<div style='width:200px;flex-shrink:0;overflow:hidden'>" &
+            "<div style='font-size:12px;font-weight:500;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & detalle_retenciones_deserciones[Agente] & "</div>" &
+            "<div style='font-size:10px;color:#8A8090;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & IF(ISBLANK([_ag]) || [_ag] = "", "&nbsp;", [_ag]) & "</div>" &
+          "</div>" &
+          "<div style='flex:1;height:10px;background:#F0EAF2;border-radius:5px;overflow:hidden'>" &
+            "<div style='height:100%;width:" & FORMAT(DIVIDE([_n], _max) * 100, "0") & "%;background:#9F62B0;border-radius:5px'></div>" &
+          "</div>" &
+          "<div style='width:90px;flex-shrink:0;text-align:right;font-size:12px;color:#1a1a1a'><b>" & FORMAT([_n], "#,##0") & "</b> <span style='color:#8A8090'>· " & FORMAT(DIVIDE([_n], _casos), "0%") & "</span></div>" &
+        "</div>",
+        "", [_n], DESC, detalle_retenciones_deserciones[Agente], ASC)
+VAR _pie =
+    IF(_nAg > 10,
+        "Top 10 de " & FORMAT(_nAg, "#,##0") & " agentes · concentran el " & FORMAT(DIVIDE(_sumTop, _casos), "0%") & " de los casos",
+        FORMAT(_nAg, "#,##0") & " agentes con casos")
+VAR _cab =
+    "<div style='font-size:14px;font-weight:600;color:#37173C;margin-bottom:2px'>Tickets retenidos con flujo de cancelación</div>" &
+    "<div style='font-size:11px;color:#8A8090;margin-bottom:12px'>Marcados como retenidos en CRM, pero el cliente tiene flujo de baja</div>"
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:16px 18px;background:#fff;border:1px solid #e8e8e8;border-top:4px solid #9F62B0;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  _cab &
+  IF(ISBLANK(_casos) || _casos = 0,
+    "<div style='font-size:13px;color:#8A8090;padding:24px 0'>Sin casos en el periodo seleccionado</div>",
+    "<div style='display:flex;align-items:baseline;gap:12px;margin-bottom:4px'>" &
+      "<span style='font-size:28px;font-weight:600;color:#1a1a1a;line-height:1'>" & FORMAT(_casos, "#,##0") & "</span>" &
+      "<span style='font-size:12px;color:#37173C;background:#F0EAF2;padding:2px 8px;border-radius:20px'>" & FORMAT(_pct, "0.0%") & " de los tickets retenidos</span>" &
+    "</div>" &
+    "<div style='font-size:11px;font-weight:" & _pesoVar & ";color:" & _colVar & ";margin-bottom:14px'>" & _txtVar & "</div>" &
+    "<div style='border-top:1px solid #F0EAF2;padding-top:12px'>" & _filas & "</div>" &
+    "<div style='font-size:10px;color:#8A8090;margin-top:6px'>" & _pie & "</div>") &
+"</div>"
+
+-- Casos No Retenidos sin Flujo  ·  tabla _Medidas
+Casos No Retenidos sin Flujo =
+CALCULATE(COUNTROWS(detalle_retenciones_deserciones), KEEPFILTERS(detalle_retenciones_deserciones[escenario_auditoria] = "NO RETENIDO SIN FLUJO - CANCELACION NO REGISTRADA"))
+
+-- Base No Retenidos sin Flujo  ·  tabla _Medidas
+Base No Retenidos sin Flujo =
+CALCULATE(COUNTROWS(detalle_retenciones_deserciones), KEEPFILTERS(detalle_retenciones_deserciones[Retencion] = "NO"))
+
+-- HTML No Retenidos sin Flujo  ·  tabla _Medidas
+HTML No Retenidos sin Flujo =
+VAR _casos = [Casos No Retenidos sin Flujo]
+VAR _base = [Base No Retenidos sin Flujo]
+VAR _pct = DIVIDE(_casos, _base)
+VAR _unMes = HASONEVALUE(Calendar[YearMonth])
+VAR _ant = IF(_unMes, CALCULATE([Casos No Retenidos sin Flujo], DATEADD(Calendar[Date], -1, MONTH)))
+VAR _var = DIVIDE(_casos - _ant, _ant)
+VAR _hayAnt = _unMes && NOT ISBLANK(_ant) && _ant > 0
+VAR _txtVar =
+    IF(_hayAnt,
+        IF(_var >= 0, "▲ ", "▼ ") & FORMAT(ABS(_var), "0%") & " vs mes anterior (" & FORMAT(_ant, "#,##0") & ")",
+        IF(_unMes, "Sin datos del mes anterior", "Selecciona un mes para comparar con el anterior"))
+VAR _colVar = IF(_hayAnt && _var > 0, "#37173C", "#8A8090")
+VAR _pesoVar = IF(_hayAnt && _var > 0, "600", "400")
+VAR _agentes =
+    FILTER(
+        ADDCOLUMNS(VALUES(detalle_retenciones_deserciones[Agente]),
+            "_n", [Casos No Retenidos sin Flujo],
+            "_ag", CALCULATE(MAX(detalle_retenciones_deserciones[Agencia (Usuarios)]))),
+        [_n] > 0)
+VAR _nAg = COUNTROWS(_agentes)
+VAR _top = TOPN(10, _agentes, [_n], DESC, detalle_retenciones_deserciones[Agente], ASC)
+VAR _max = MAXX(_top, [_n])
+VAR _sumTop = SUMX(_top, [_n])
+VAR _filas =
+    CONCATENATEX(_top,
+        "<div style='display:flex;align-items:center;gap:10px;margin:0 0 7px 0'>" &
+          "<div style='width:200px;flex-shrink:0;overflow:hidden'>" &
+            "<div style='font-size:12px;font-weight:500;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & detalle_retenciones_deserciones[Agente] & "</div>" &
+            "<div style='font-size:10px;color:#8A8090;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" & IF(ISBLANK([_ag]) || [_ag] = "", "&nbsp;", [_ag]) & "</div>" &
+          "</div>" &
+          "<div style='flex:1;height:10px;background:#F0EAF2;border-radius:5px;overflow:hidden'>" &
+            "<div style='height:100%;width:" & FORMAT(DIVIDE([_n], _max) * 100, "0") & "%;background:#9F62B0;border-radius:5px'></div>" &
+          "</div>" &
+          "<div style='width:90px;flex-shrink:0;text-align:right;font-size:12px;color:#1a1a1a'><b>" & FORMAT([_n], "#,##0") & "</b> <span style='color:#8A8090'>· " & FORMAT(DIVIDE([_n], _casos), "0%") & "</span></div>" &
+        "</div>",
+        "", [_n], DESC, detalle_retenciones_deserciones[Agente], ASC)
+VAR _pie =
+    IF(_nAg > 10,
+        "Top 10 de " & FORMAT(_nAg, "#,##0") & " agentes · concentran el " & FORMAT(DIVIDE(_sumTop, _casos), "0%") & " de los casos",
+        FORMAT(_nAg, "#,##0") & " agentes con casos")
+VAR _cab =
+    "<div style='font-size:14px;font-weight:600;color:#37173C;margin-bottom:2px'>Tickets no retenidos sin flujo de cancelación</div>" &
+    "<div style='font-size:11px;color:#8A8090;margin-bottom:12px'>Marcados como no retenidos en CRM, pero no hay flujo de baja en Tytan</div>"
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:16px 18px;background:#fff;border:1px solid #e8e8e8;border-top:4px solid #9F62B0;border-radius:12px;height:100%;box-sizing:border-box'>" &
+  _cab &
+  IF(ISBLANK(_casos) || _casos = 0,
+    "<div style='font-size:13px;color:#8A8090;padding:24px 0'>Sin casos en el periodo seleccionado</div>",
+    "<div style='display:flex;align-items:baseline;gap:12px;margin-bottom:4px'>" &
+      "<span style='font-size:28px;font-weight:600;color:#1a1a1a;line-height:1'>" & FORMAT(_casos, "#,##0") & "</span>" &
+      "<span style='font-size:12px;color:#37173C;background:#F0EAF2;padding:2px 8px;border-radius:20px'>" & FORMAT(_pct, "0.0%") & " de los tickets no retenidos</span>" &
+    "</div>" &
+    "<div style='font-size:11px;font-weight:" & _pesoVar & ";color:" & _colVar & ";margin-bottom:14px'>" & _txtVar & "</div>" &
+    "<div style='border-top:1px solid #F0EAF2;padding-top:12px'>" & _filas & "</div>" &
+    "<div style='font-size:10px;color:#8A8090;margin-top:6px'>" & _pie & "</div>") &
+"</div>"

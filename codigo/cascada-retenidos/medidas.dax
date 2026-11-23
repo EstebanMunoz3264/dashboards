@@ -1,0 +1,354 @@
+-- Casc_Total_Retenidos  ·  tabla _Medidas
+Casc_Total_Retenidos =
+COUNTROWS ( cascada_retenidos_detalle )
+
+-- Casc_Base_Mes0  ·  tabla _Medidas
+Casc_Base_Mes0 =
+CALCULATE ( COUNTROWS ( cascada_retenidos_detalle ), cascada_retenidos_detalle[vigente_mes_0] = 1 )
+
+-- Casc_Vigentes  ·  tabla _Medidas
+Casc_Vigentes =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+VAR _esc = SELECTEDVALUE ( 'Escenario Suspension'[Id], 0 )
+VAR _tipos = VALUES ( 'Tipo Salida'[detalle_salida] )
+VAR _baseObs =
+    CALCULATE (
+        COUNTROWS ( cascada_retenidos_detalle ),
+        cascada_retenidos_detalle[vigente_mes_0] = 1,
+        cascada_retenidos_detalle[meses_observados] >= _k
+    )
+VAR _bajas =
+    COUNTROWS (
+        FILTER (
+            CALCULATETABLE ( cascada_retenidos_detalle, cascada_retenidos_detalle[vigente_mes_0] = 1, cascada_retenidos_detalle[meses_observados] >= _k ),
+            VAR _ms =
+                SWITCH ( _esc,
+                    1, cascada_retenidos_detalle[mes_salida_si_susp_desercion_baja],
+                    2, cascada_retenidos_detalle[mes_salida_si_desercion_y_pago_baja],
+                    3, cascada_retenidos_detalle[mes_salida_si_toda_susp_baja],
+                    cascada_retenidos_detalle[mes_salida]
+                )
+            RETURN
+                NOT ISBLANK ( _ms ) && _ms <= _k && ( ISBLANK ( cascada_retenidos_detalle[detalle_salida] ) || cascada_retenidos_detalle[detalle_salida] IN _tipos )
+        )
+    )
+RETURN
+    IF (
+        ISBLANK ( _k ) || _k < 0 || COALESCE ( _baseObs, 0 ) = 0,
+        BLANK (),
+        _baseObs - COALESCE ( _bajas, 0 )
+    )
+
+-- Casc_Cascada  ·  tabla _Medidas
+Casc_Cascada =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+RETURN
+    IF ( _k = -1, [Casc_Total_Retenidos], [Casc_Vigentes] )
+
+-- Casc_Pct_Retencion  ·  tabla _Medidas
+Casc_Pct_Retencion =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+VAR _baseObs =
+    CALCULATE (
+        COUNTROWS ( cascada_retenidos_detalle ),
+        cascada_retenidos_detalle[vigente_mes_0] = 1,
+        cascada_retenidos_detalle[meses_observados] >= _k
+    )
+RETURN
+    IF ( ISBLANK ( _k ) || _k < 1, BLANK (), DIVIDE ( [Casc_Vigentes], _baseObs ) )
+
+-- Casc_Pct_Promedio_Simple  ·  tabla _Medidas
+Casc_Pct_Promedio_Simple =
+AVERAGEX ( VALUES ( cascada_retenidos_detalle[anio_mes] ), [Casc_Pct_Retencion] )
+
+-- Casc_Bajas_Acumuladas  ·  tabla _Medidas
+Casc_Bajas_Acumuladas =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+VAR _baseObs =
+    CALCULATE (
+        COUNTROWS ( cascada_retenidos_detalle ),
+        cascada_retenidos_detalle[vigente_mes_0] = 1,
+        cascada_retenidos_detalle[meses_observados] >= _k
+    )
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( _k ) || _k = -1, BLANK (),
+        _k = 0, [Casc_Total_Retenidos] - [Casc_Base_Mes0],
+        ISBLANK ( [Casc_Vigentes] ), BLANK (),
+        _baseObs - [Casc_Vigentes]
+    )
+
+-- Casc_Bajas_Del_Mes  ·  tabla _Medidas
+Casc_Bajas_Del_Mes =
+IF (
+    NOT HASONEVALUE ( 'Mes Transcurrido'[Mes] ),
+    -- Total de la fila / columna: suma de los meses visibles
+    SUMX ( VALUES ( 'Mes Transcurrido'[Mes] ), [Casc_Bajas_Del_Mes_Base] ),
+    [Casc_Bajas_Del_Mes_Base]
+)
+
+-- Casc_Salidas_Del_Mes  ·  tabla _Medidas
+Casc_Salidas_Del_Mes =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+RETURN
+    SWITCH (
+        TRUE (),
+        NOT ISFILTERED ( 'Mes Transcurrido'[Etiqueta] ) && NOT ISFILTERED ( 'Mes Transcurrido'[Mes] ),
+            CALCULATE (
+                COUNTROWS ( cascada_retenidos_detalle ),
+                NOT ISBLANK ( cascada_retenidos_detalle[mes_salida] )
+            ),
+        ISBLANK ( _k ) || _k < 0, BLANK (),
+        COALESCE (
+            CALCULATE (
+                COUNTROWS ( cascada_retenidos_detalle ),
+                cascada_retenidos_detalle[mes_salida] = _k
+            ),
+            0
+        )
+    )
+
+-- Casc_Pct_Salidas  ·  tabla _Medidas
+Casc_Pct_Salidas =
+DIVIDE (
+    [Casc_Salidas_Del_Mes],
+    CALCULATE (
+        [Casc_Salidas_Del_Mes],
+        REMOVEFILTERS ( cascada_retenidos_detalle[Motivo_Real] ),
+        REMOVEFILTERS ( cascada_retenidos_detalle[motivo_terminacion] ),
+        REMOVEFILTERS ( cascada_retenidos_detalle[tipo_terminacion] ),
+        REMOVEFILTERS ( cascada_retenidos_detalle[clasificacion_salida] ),
+        REMOVEFILTERS ( cascada_retenidos_detalle[detalle_salida] )
+    )
+)
+
+-- Casc_Bajas_Totales  ·  tabla _Medidas
+Casc_Bajas_Totales =
+VAR _esc = SELECTEDVALUE ( 'Escenario Suspension'[Id], 0 )
+VAR _tipos = VALUES ( 'Tipo Salida'[detalle_salida] )
+RETURN
+    COUNTROWS (
+        FILTER (
+            CALCULATETABLE ( cascada_retenidos_detalle, cascada_retenidos_detalle[vigente_mes_0] = 1 ),
+            VAR _ms =
+                SWITCH ( _esc,
+                    1, cascada_retenidos_detalle[mes_salida_si_susp_desercion_baja],
+                    2, cascada_retenidos_detalle[mes_salida_si_desercion_y_pago_baja],
+                    3, cascada_retenidos_detalle[mes_salida_si_toda_susp_baja],
+                    cascada_retenidos_detalle[mes_salida]
+                )
+            RETURN
+                NOT ISBLANK ( _ms ) && ( ISBLANK ( cascada_retenidos_detalle[detalle_salida] ) || cascada_retenidos_detalle[detalle_salida] IN _tipos )
+        )
+    )
+
+-- Casc_Prom_Meses_Hasta_Baja  ·  tabla _Medidas
+Casc_Prom_Meses_Hasta_Baja =
+VAR _esc = SELECTEDVALUE ( 'Escenario Suspension'[Id], 0 )
+VAR _tipos = VALUES ( 'Tipo Salida'[detalle_salida] )
+RETURN
+    AVERAGEX (
+        FILTER (
+            ADDCOLUMNS (
+                CALCULATETABLE ( cascada_retenidos_detalle, cascada_retenidos_detalle[vigente_mes_0] = 1 ),
+                "@ms",
+                SWITCH ( _esc,
+                    1, cascada_retenidos_detalle[mes_salida_si_susp_desercion_baja],
+                    2, cascada_retenidos_detalle[mes_salida_si_desercion_y_pago_baja],
+                    3, cascada_retenidos_detalle[mes_salida_si_toda_susp_baja],
+                    cascada_retenidos_detalle[mes_salida]
+                )
+            ),
+            NOT ISBLANK ( [@ms] ) && ( ISBLANK ( cascada_retenidos_detalle[detalle_salida] ) || cascada_retenidos_detalle[detalle_salida] IN _tipos )
+        ),
+        [@ms]
+    )
+
+-- Casc_Prom_Dias_Hasta_Baja  ·  tabla _Medidas
+Casc_Prom_Dias_Hasta_Baja =
+VAR _tipos = VALUES ( 'Tipo Salida'[detalle_salida] )
+RETURN
+    CALCULATE (
+        AVERAGE ( cascada_retenidos_detalle[dias_hasta_baja] ),
+        cascada_retenidos_detalle[vigente_mes_0] = 1,
+        NOT ISBLANK ( cascada_retenidos_detalle[mes_salida] ),
+        TREATAS ( _tipos, cascada_retenidos_detalle[detalle_salida] )
+    )
+
+-- Casc_Permanencia_Media_12m  ·  tabla _Medidas
+Casc_Permanencia_Media_12m =
+VAR _esc = SELECTEDVALUE ( 'Escenario Suspension'[Id], 0 )
+VAR _tipos = VALUES ( 'Tipo Salida'[detalle_salida] )
+RETURN
+    AVERAGEX (
+        FILTER (
+            cascada_retenidos_detalle,
+            cascada_retenidos_detalle[vigente_mes_0] = 1
+                && cascada_retenidos_detalle[meses_observados] = 12
+        ),
+        VAR _ms =
+            SWITCH ( _esc,
+                    1, cascada_retenidos_detalle[mes_salida_si_susp_desercion_baja],
+                    2, cascada_retenidos_detalle[mes_salida_si_desercion_y_pago_baja],
+                    3, cascada_retenidos_detalle[mes_salida_si_toda_susp_baja],
+                    cascada_retenidos_detalle[mes_salida]
+                )
+        RETURN
+            IF ( NOT ISBLANK ( _ms ) && ( ISBLANK ( cascada_retenidos_detalle[detalle_salida] ) || cascada_retenidos_detalle[detalle_salida] IN _tipos ), _ms, 12 )
+    )
+
+-- Casc_Pct_Ret_Mes1  ·  tabla _Medidas
+Casc_Pct_Ret_Mes1 =
+CALCULATE ( [Casc_Pct_Retencion], 'Mes Transcurrido'[Mes] = 1 )
+
+-- Casc_Pct_Ret_Mes3  ·  tabla _Medidas
+Casc_Pct_Ret_Mes3 =
+CALCULATE ( [Casc_Pct_Retencion], 'Mes Transcurrido'[Mes] = 3 )
+
+-- Casc_Pct_Ret_Mes6  ·  tabla _Medidas
+Casc_Pct_Ret_Mes6 =
+CALCULATE ( [Casc_Pct_Retencion], 'Mes Transcurrido'[Mes] = 6 )
+
+-- Casc_Pct_Ret_Mes12  ·  tabla _Medidas
+Casc_Pct_Ret_Mes12 =
+CALCULATE ( [Casc_Pct_Retencion], 'Mes Transcurrido'[Mes] = 12 )
+
+-- Casc_Pasan_Por_Suspension  ·  tabla _Medidas
+Casc_Pasan_Por_Suspension =
+CALCULATE (
+    COUNTROWS ( cascada_retenidos_detalle ),
+    NOT ISBLANK ( cascada_retenidos_detalle[mes_suspension] ),
+    cascada_retenidos_detalle[vigente_mes_0] = 1
+)
+
+-- Casc_Fecha_Actualizacion  ·  tabla _Medidas
+Casc_Fecha_Actualizacion =
+MAX ( cascada_retenidos_detalle[fecha_actualizacion] )
+
+-- Casc_Bajas_Del_Mes_Base  ·  tabla _Medidas
+Casc_Bajas_Del_Mes_Base =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+VAR _esc = SELECTEDVALUE ( 'Escenario Suspension'[Id], 0 )
+VAR _tipos = VALUES ( 'Tipo Salida'[detalle_salida] )
+VAR _salen =
+    COUNTROWS (
+        FILTER (
+            CALCULATETABLE ( cascada_retenidos_detalle, cascada_retenidos_detalle[vigente_mes_0] = 1 ),
+            VAR _ms =
+                SWITCH ( _esc,
+                    1, cascada_retenidos_detalle[mes_salida_si_susp_desercion_baja],
+                    2, cascada_retenidos_detalle[mes_salida_si_desercion_y_pago_baja],
+                    3, cascada_retenidos_detalle[mes_salida_si_toda_susp_baja],
+                    cascada_retenidos_detalle[mes_salida]
+                )
+            RETURN
+                _ms = _k && NOT ISBLANK ( _ms ) && ( ISBLANK ( cascada_retenidos_detalle[detalle_salida] ) || cascada_retenidos_detalle[detalle_salida] IN _tipos )
+        )
+    )
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( _k ) || _k < 0, BLANK (),
+        _k = 0,
+            COALESCE ( CALCULATE ( COUNTROWS ( cascada_retenidos_detalle ), cascada_retenidos_detalle[vigente_mes_0] = 0 ), 0 ) + COALESCE ( _salen, 0 ),
+        ISBLANK ( [Casc_Vigentes] ), BLANK (),
+        COALESCE ( _salen, 0 )
+    )
+
+-- Casc_Suspendidos_Mes  ·  tabla _Medidas
+Casc_Suspendidos_Mes =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+VAR _esc = SELECTEDVALUE ( 'Escenario Suspension'[Id], 0 )
+RETURN
+    IF (
+        ISBLANK ( _k ) || _k < 0,
+        BLANK (),
+        COUNTROWS (
+            FILTER (
+                cascada_retenidos_detalle,
+                VAR _ms =
+                    SWITCH ( _esc,
+                    1, cascada_retenidos_detalle[mes_salida_si_susp_desercion_baja],
+                    2, cascada_retenidos_detalle[mes_salida_si_desercion_y_pago_baja],
+                    3, cascada_retenidos_detalle[mes_salida_si_toda_susp_baja],
+                    cascada_retenidos_detalle[mes_salida]
+                )
+                RETURN
+                    cascada_retenidos_detalle[vigente_mes_0] = 1
+                        && cascada_retenidos_detalle[meses_observados] >= _k
+                        && ( ISBLANK ( _ms ) || _ms > _k )
+                        && SWITCH ( _k,
+                    0, cascada_retenidos_detalle[estado_mes_0],
+                    1, cascada_retenidos_detalle[estado_mes_1],
+                    2, cascada_retenidos_detalle[estado_mes_2],
+                    3, cascada_retenidos_detalle[estado_mes_3],
+                    4, cascada_retenidos_detalle[estado_mes_4],
+                    5, cascada_retenidos_detalle[estado_mes_5],
+                    6, cascada_retenidos_detalle[estado_mes_6],
+                    7, cascada_retenidos_detalle[estado_mes_7],
+                    8, cascada_retenidos_detalle[estado_mes_8],
+                    9, cascada_retenidos_detalle[estado_mes_9],
+                    10, cascada_retenidos_detalle[estado_mes_10],
+                    11, cascada_retenidos_detalle[estado_mes_11],
+                    12, cascada_retenidos_detalle[estado_mes_12]
+                        ) = "SUSPENDIDO"
+            )
+        ) + 0
+    )
+
+-- Casc_Activos_Mes  ·  tabla _Medidas
+Casc_Activos_Mes =
+IF ( ISBLANK ( [Casc_Vigentes] ), BLANK (), [Casc_Vigentes] - [Casc_Suspendidos_Mes] )
+
+-- Casc_Bajas_Acum_Mes  ·  tabla _Medidas
+Casc_Bajas_Acum_Mes =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+VAR _baseObs =
+    CALCULATE (
+        COUNTROWS ( cascada_retenidos_detalle ),
+        cascada_retenidos_detalle[vigente_mes_0] = 1,
+        cascada_retenidos_detalle[meses_observados] >= _k
+    )
+RETURN
+    IF ( ISBLANK ( [Casc_Vigentes] ), BLANK (), _baseObs - [Casc_Vigentes] )
+
+-- Casc_No_Activos_Mes  ·  tabla _Medidas
+Casc_No_Activos_Mes =
+IF ( ISBLANK ( [Casc_Vigentes] ), BLANK (), [Casc_Suspendidos_Mes] + [Casc_Bajas_Acum_Mes] )
+
+-- Casc_Pct_Suspendidos_Mes  ·  tabla _Medidas
+Casc_Pct_Suspendidos_Mes =
+VAR _k = SELECTEDVALUE ( 'Mes Transcurrido'[Mes] )
+VAR _baseObs =
+    CALCULATE (
+        COUNTROWS ( cascada_retenidos_detalle ),
+        cascada_retenidos_detalle[vigente_mes_0] = 1,
+        cascada_retenidos_detalle[meses_observados] >= _k
+    )
+RETURN
+    IF ( ISBLANK ( _k ) || _k < 0, BLANK (), DIVIDE ( [Casc_Suspendidos_Mes], _baseObs ) )
+
+-- Casc_Cuentas_Ruta  ·  tabla _Medidas
+Casc_Cuentas_Ruta =
+CALCULATE ( COUNTROWS ( cascada_retenidos_detalle ), cascada_retenidos_detalle[vigente_mes_0] = 1 )
+
+-- Casc_Pct_Ruta  ·  tabla _Medidas
+Casc_Pct_Ruta =
+DIVIDE ( [Casc_Cuentas_Ruta], CALCULATE ( [Casc_Cuentas_Ruta], REMOVEFILTERS ( cascada_retenidos_detalle[Ruta_Salida], cascada_retenidos_detalle[Ruta_Orden] ) ) )
+
+-- Casc_Siguen_Suspendidas  ·  tabla _Medidas
+Casc_Siguen_Suspendidas =
+CALCULATE ( [Casc_Cuentas_Ruta], cascada_retenidos_detalle[Ruta_Salida] = "Sigue suspendida" )
+
+-- Casc_Bajas_Tras_Suspension  ·  tabla _Medidas
+Casc_Bajas_Tras_Suspension =
+CALCULATE ( [Casc_Cuentas_Ruta], cascada_retenidos_detalle[Ruta_Salida] = "Baja tras suspensión" )
+
+-- Casc_Bajas_Directas  ·  tabla _Medidas
+Casc_Bajas_Directas =
+CALCULATE ( [Casc_Cuentas_Ruta], cascada_retenidos_detalle[Ruta_Salida] = "Baja directa" )
+
+-- Casc_Siguen_Activas  ·  tabla _Medidas
+Casc_Siguen_Activas =
+CALCULATE ( [Casc_Cuentas_Ruta], cascada_retenidos_detalle[Ruta_Salida] = "Sigue activa" )

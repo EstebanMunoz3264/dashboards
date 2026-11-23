@@ -1,0 +1,1417 @@
+-- Indice retencion  ·  tabla Medidas
+Indice retencion =
+DIVIDE(
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[Retencion] = "SI",
+        'tickets_deserciones'[es_excluido] = FALSE()
+    ),
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[es_excluido] = FALSE()
+    ),
+    0
+)
+
+-- Indice Agencia  ·  tabla Medidas
+Indice Agencia =
+CALCULATE(
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI"),
+        COUNTROWS('tickets_deserciones'),
+        0
+    ),
+    'tickets_deserciones'[Departamento] = "Agencia",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Indice CallCenter  ·  tabla Medidas
+Indice CallCenter =
+CALCULATE(
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI"),
+        COUNTROWS('tickets_deserciones'),
+        0
+    ),
+    'tickets_deserciones'[Departamento] = "CallCenter",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Indice Total 1  ·  tabla Medidas
+Indice Total 1 =
+CALCULATE(
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI"),
+        COUNTROWS('tickets_deserciones'),
+        0
+    ),
+    'tickets_deserciones'[Departamento] IN {"Agencia", "CallCenter"},
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Cuenta_rows  ·  tabla Medidas
+Cuenta_rows =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_retenidos  ·  tabla Medidas
+Total_retenidos =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "SI",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_no_retenidos  ·  tabla Medidas
+Total_no_retenidos =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "NO",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Indice_Total_region  ·  tabla Medidas
+Indice_Total_region =
+CALCULATE(
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI"),
+        COUNTROWS('tickets_deserciones'),
+        0
+    ),
+    'tickets_deserciones'[Region] IN {"Region 1", "Region 2"},
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Indice_region1  ·  tabla Medidas
+Indice_region1 =
+CALCULATE(
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI"),
+        COUNTROWS('tickets_deserciones'),
+        0
+    ),
+    'tickets_deserciones'[Region] = "Region 1",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Indice_region2  ·  tabla Medidas
+Indice_region2 =
+CALCULATE(
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI"),
+        COUNTROWS('tickets_deserciones'),
+        0
+    ),
+    'tickets_deserciones'[Region] = "Region 2",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_solicitudes  ·  tabla Medidas
+Total_solicitudes =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- HTML_KPI_Solicitudes1  ·  tabla Medidas
+HTML_KPI_Solicitudes1 =
+VAR _minFecha = CALCULATE(MIN('Calendar'[Date]))
+VAR _maxFecha = CALCULATE(MAX('Calendar'[Date]))
+VAR _diaMax   = DAY(_maxFecha)
+VAR _diasEnMes = DAY(EOMONTH(_minFecha, 0))
+VAR _todosDias = CALCULATE(COUNTROWS('Calendar')) = _diasEnMes
+VAR _minAnt   = DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, 1)
+VAR _maxAnt   = IF(_todosDias, EOMONTH(_minFecha, -1), DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, _diaMax))
+VAR _valor    = CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[es_excluido] = FALSE())
+VAR _anterior =
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[es_excluido] = FALSE(),
+        ALL('Calendar'),
+        'Calendar'[Date] >= _minAnt,
+        'Calendar'[Date] <= _maxAnt
+    )
+VAR _delta    = _valor - _anterior
+VAR _signo    = IF(_delta >= 0, "+", "")
+VAR _color    = IF(_delta >= 0, "#5A9E6F", "#C0392B")
+VAR _arrow    = IF(_delta >= 0, "▲", "▼")
+VAR _bgdelta  = IF(_delta >= 0, "#d0ecd8", "#f5d0d0")
+VAR _valorFmt = FORMAT(_valor, "#,0")
+VAR _antFmt   = FORMAT(_anterior, "#,0")
+VAR _deltaFmt = FORMAT(ABS(_delta), "#,0")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border-radius:8px;border:1px solid #E8DCEA;border-left:4px solid #C98FD4;padding:16px 18px 12px;box-shadow:0 2px 8px rgba(120,62,128,0.08);height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;'>" &
+"<div style='font-size:16px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#000000;margin-bottom:6px;'>Total Solicitudes</div>" &
+"<div style='font-size:40px;font-weight:700;color:#C98FD4;letter-spacing:-1px;line-height:1;margin-bottom:10px;'>" & _valorFmt & "</div>" &
+"<div style='border-top:1px solid #E8DCEA;padding-top:8px;display:flex;align-items:center;justify-content:space-between;'>" &
+"<div style='display:flex;align-items:center;gap:5px;'>" &
+"<span style='background:" & _bgdelta & ";color:" & _color & ";border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;'>" & _arrow & "</span>" &
+"<span style='font-size:18px;font-weight:600;color:" & _color & ";'>" & _signo & _deltaFmt & " vs mes ant.</span>" &
+"</div>" &
+"<span style='font-size:16px;color:#000000;'>Ant: " & _antFmt & "</span>" &
+"</div>" &
+"</div>"
+
+-- HTML_KPI_Retenidos1  ·  tabla Medidas
+HTML_KPI_Retenidos1 =
+VAR _minFecha = CALCULATE(MIN('Calendar'[Date]))
+VAR _maxFecha = CALCULATE(MAX('Calendar'[Date]))
+VAR _diaMax   = DAY(_maxFecha)
+VAR _diasEnMes = DAY(EOMONTH(_minFecha, 0))
+VAR _todosDias = CALCULATE(COUNTROWS('Calendar')) = _diasEnMes
+VAR _minAnt   = DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, 1)
+VAR _maxAnt   = IF(_todosDias, EOMONTH(_minFecha, -1), DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, _diaMax))
+VAR _valor =
+    CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI", 'tickets_deserciones'[es_excluido] = FALSE())
+VAR _anterior =
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[Retencion] = "SI",
+        'tickets_deserciones'[es_excluido] = FALSE(),
+        ALL('Calendar'),
+        'Calendar'[Date] >= _minAnt,
+        'Calendar'[Date] <= _maxAnt
+    )
+VAR _delta    = _valor - _anterior
+VAR _signo    = IF(_delta >= 0, "+", "")
+VAR _color    = IF(_delta >= 0, "#5A9E6F", "#C0392B")
+VAR _arrow    = IF(_delta >= 0, "▲", "▼")
+VAR _bgdelta  = IF(_delta >= 0, "#d0ecd8", "#f5d0d0")
+VAR _valorFmt = FORMAT(_valor, "#,0")
+VAR _antFmt   = FORMAT(_anterior, "#,0")
+VAR _deltaFmt = FORMAT(ABS(_delta), "#,0")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border-radius:8px;border:1px solid #E8DCEA;border-left:4px solid #5A9E6F;padding:16px 18px 12px;box-shadow:0 2px 8px rgba(90,158,111,0.08);height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;'>" &
+"<div style='font-size:16px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#000000;margin-bottom:6px;'>Total Retenidos</div>" &
+"<div style='font-size:40px;font-weight:700;color:#5A9E6F;letter-spacing:-1px;line-height:1;margin-bottom:10px;'>" & _valorFmt & "</div>" &
+"<div style='border-top:1px solid #E8DCEA;padding-top:8px;display:flex;align-items:center;justify-content:space-between;'>" &
+"<div style='display:flex;align-items:center;gap:5px;'>" &
+"<span style='background:" & _bgdelta & ";color:" & _color & ";border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;'>" & _arrow & "</span>" &
+"<span style='font-size:18px;font-weight:600;color:" & _color & ";'>" & _signo & _deltaFmt & " vs mes ant.</span>" &
+"</div>" &
+"<span style='font-size:16px;color:#000000;'>Ant: " & _antFmt & "</span>" &
+"</div>" &
+"</div>"
+
+-- HTML_KPI_NoRetenidos1  ·  tabla Medidas
+HTML_KPI_NoRetenidos1 =
+VAR _minFecha = CALCULATE(MIN('Calendar'[Date]))
+VAR _maxFecha = CALCULATE(MAX('Calendar'[Date]))
+VAR _diaMax   = DAY(_maxFecha)
+VAR _diasEnMes = DAY(EOMONTH(_minFecha, 0))
+VAR _todosDias = CALCULATE(COUNTROWS('Calendar')) = _diasEnMes
+VAR _minAnt   = DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, 1)
+VAR _maxAnt   = IF(_todosDias, EOMONTH(_minFecha, -1), DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, _diaMax))
+VAR _valor =
+    CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "NO", 'tickets_deserciones'[es_excluido] = FALSE())
+VAR _anterior =
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[Retencion] = "NO",
+        'tickets_deserciones'[es_excluido] = FALSE(),
+        ALL('Calendar'),
+        'Calendar'[Date] >= _minAnt,
+        'Calendar'[Date] <= _maxAnt
+    )
+VAR _delta    = _valor - _anterior
+VAR _signo    = IF(_delta >= 0, "+", "")
+VAR _color    = IF(_delta <= 0, "#5A9E6F", "#C0392B")
+VAR _arrow    = IF(_delta <= 0, "▼", "▲")
+VAR _bgdelta  = IF(_delta <= 0, "#d0ecd8", "#f5d0d0")
+VAR _valorFmt = FORMAT(_valor, "#,0")
+VAR _antFmt   = FORMAT(_anterior, "#,0")
+VAR _deltaFmt = FORMAT(ABS(_delta), "#,0")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border-radius:8px;border:1px solid #E8DCEA;border-left:4px solid #C0392B;padding:16px 18px 12px;box-shadow:0 2px 8px rgba(192,57,43,0.08);height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;'>" &
+"<div style='font-size:16px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#000000;margin-bottom:6px;'>No Retenidos</div>" &
+"<div style='font-size:40px;font-weight:700;color:#C0392B;letter-spacing:-1px;line-height:1;margin-bottom:10px;'>" & _valorFmt & "</div>" &
+"<div style='border-top:1px solid #E8DCEA;padding-top:8px;display:flex;align-items:center;justify-content:space-between;'>" &
+"<div style='display:flex;align-items:center;gap:5px;'>" &
+"<span style='background:" & _bgdelta & ";color:" & _color & ";border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;'>" & _arrow & "</span>" &
+"<span style='font-size:18px;font-weight:600;color:" & _color & ";'>" & _signo & _deltaFmt & " vs mes ant.</span>" &
+"</div>" &
+"<span style='font-size:16px;color:#000000;'>Ant: " & _antFmt & "</span>" &
+"</div>" &
+"</div>"
+
+-- HTML_KPI_Indice1  ·  tabla Medidas
+HTML_KPI_Indice1 =
+VAR _minFecha = CALCULATE(MIN('Calendar'[Date]))
+VAR _maxFecha = CALCULATE(MAX('Calendar'[Date]))
+VAR _diaMax   = DAY(_maxFecha)
+VAR _diasEnMes = DAY(EOMONTH(_minFecha, 0))
+VAR _todosDias = CALCULATE(COUNTROWS('Calendar')) = _diasEnMes
+VAR _minAnt   = DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, 1)
+VAR _maxAnt   = IF(_todosDias, EOMONTH(_minFecha, -1), DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, _diaMax))
+VAR _valor =
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI", 'tickets_deserciones'[es_excluido] = FALSE()),
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[es_excluido] = FALSE()),
+        0
+    )
+VAR _retenidosAnt =
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[Retencion] = "SI",
+        'tickets_deserciones'[es_excluido] = FALSE(),
+        ALL('Calendar'),
+        'Calendar'[Date] >= _minAnt,
+        'Calendar'[Date] <= _maxAnt
+    )
+VAR _totalAnt =
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[es_excluido] = FALSE(),
+        ALL('Calendar'),
+        'Calendar'[Date] >= _minAnt,
+        'Calendar'[Date] <= _maxAnt
+    )
+VAR _anterior = DIVIDE(_retenidosAnt, _totalAnt, 0)
+VAR _delta    = (_valor - _anterior) * 100
+VAR _signo    = IF(_delta >= 0, "+", "")
+VAR _color    = IF(_delta >= 0, "#5A9E6F", "#C0392B")
+VAR _arrow    = IF(_delta >= 0, "▲", "▼")
+VAR _bgdelta  = IF(_delta >= 0, "#d0ecd8", "#f5d0d0")
+VAR _pct      = FORMAT(_valor, "0.0%")
+VAR _antPct   = FORMAT(_anterior, "0.0%")
+VAR _deltaPct = SUBSTITUTE(FORMAT(ABS(_delta), "0.0"), ",", ".")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border-radius:8px;border:1px solid #E8DCEA;border-left:4px solid #783E80;padding:16px 18px 12px;box-shadow:0 2px 8px rgba(201,143,212,0.08);height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;'>" &
+"<div style='font-size:16px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#000000;margin-bottom:6px;'>Indice de Retencion</div>" &
+"<div style='font-size:40px;font-weight:700;color:#783E80;letter-spacing:-1px;line-height:1;margin-bottom:10px;'>" & _pct & "</div>" &
+"<div style='border-top:1px solid #E8DCEA;padding-top:8px;display:flex;align-items:center;justify-content:space-between;'>" &
+"<div style='display:flex;align-items:center;gap:5px;'>" &
+"<span style='background:" & _bgdelta & ";color:" & _color & ";border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;'>" & _arrow & "</span>" &
+"<span style='font-size:18px;font-weight:600;color:" & _color & ";'>" & _signo & _deltaPct & " pp vs mes ant.</span>" &
+"</div>" &
+"<span style='font-size:16px;color:#000000;'>Ant: <span style='font-weight:600;color:#000000;'>" & _antPct & "</span></span>" &
+"</div>" &
+"</div>"
+
+-- HTML_Histograma_Efectividad_agencia  ·  tabla Medidas
+HTML_Histograma_Efectividad_agencia =
+VAR _Tabla =
+    ADDCOLUMNS(
+        CALCULATETABLE(
+            VALUES('tickets_deserciones'[Agent]),
+            'tickets_deserciones'[Departamento] = "Agencia",
+            'tickets_deserciones'[es_excluido] = FALSE()
+        ),
+        "@efectividad",
+        DIVIDE(
+            CALCULATE(
+                COUNTROWS('tickets_deserciones'),
+                'tickets_deserciones'[Retencion] = "SI",
+                'tickets_deserciones'[es_excluido] = FALSE(),
+                'tickets_deserciones'[Departamento] = "Agencia"
+            ),
+            CALCULATE(
+                COUNTROWS('tickets_deserciones'),
+                'tickets_deserciones'[es_excluido] = FALSE(),
+                'tickets_deserciones'[Departamento] = "Agencia"
+            ),
+            0
+        )
+    )
+
+VAR _R1  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0   && [@efectividad] < 0.1))
+VAR _R2  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.1 && [@efectividad] < 0.2))
+VAR _R3  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.2 && [@efectividad] < 0.3))
+VAR _R4  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.3 && [@efectividad] < 0.4))
+VAR _R5  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.4 && [@efectividad] < 0.5))
+VAR _R6  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.5 && [@efectividad] < 0.6))
+VAR _R7  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.6 && [@efectividad] < 0.7))
+VAR _R8  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.7 && [@efectividad] < 0.8))
+VAR _R9  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.8 && [@efectividad] < 0.9))
+VAR _R10 = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.9 && [@efectividad] <= 1))
+
+VAR _Max   = MAXX({_R1,_R2,_R3,_R4,_R5,_R6,_R7,_R8,_R9,_R10}, [Value])
+VAR _Total = _R1+_R2+_R3+_R4+_R5+_R6+_R7+_R8+_R9+_R10
+
+VAR _H1  = IF(_Max > 0, DIVIDE(_R1,  _Max) * 120, 0)
+VAR _H2  = IF(_Max > 0, DIVIDE(_R2,  _Max) * 120, 0)
+VAR _H3  = IF(_Max > 0, DIVIDE(_R3,  _Max) * 120, 0)
+VAR _H4  = IF(_Max > 0, DIVIDE(_R4,  _Max) * 120, 0)
+VAR _H5  = IF(_Max > 0, DIVIDE(_R5,  _Max) * 120, 0)
+VAR _H6  = IF(_Max > 0, DIVIDE(_R6,  _Max) * 120, 0)
+VAR _H7  = IF(_Max > 0, DIVIDE(_R7,  _Max) * 120, 0)
+VAR _H8  = IF(_Max > 0, DIVIDE(_R8,  _Max) * 120, 0)
+VAR _H9  = IF(_Max > 0, DIVIDE(_R9,  _Max) * 120, 0)
+VAR _H10 = IF(_Max > 0, DIVIDE(_R10, _Max) * 120, 0)
+
+VAR _bW   = 34
+VAR _gap  = 12
+VAR _base = 130
+
+VAR _x1  = 20
+VAR _x2  = _x1  + _bW + _gap
+VAR _x3  = _x2  + _bW + _gap
+VAR _x4  = _x3  + _bW + _gap
+VAR _x5  = _x4  + _bW + _gap
+VAR _x6  = _x5  + _bW + _gap
+VAR _x7  = _x6  + _bW + _gap
+VAR _x8  = _x7  + _bW + _gap
+VAR _x9  = _x8  + _bW + _gap
+VAR _x10 = _x9  + _bW + _gap
+
+VAR _c1  = "#c9a8e8"
+VAR _c2  = "#b890d8"
+VAR _c3  = "#a478c8"
+VAR _c4  = "#9060b8"
+VAR _c5  = "#7b4fa6"
+VAR _c6  = "#6a3d96"
+VAR _c7  = "#5a2d86"
+VAR _c8  = "#4a1e76"
+VAR _c9  = "#3b1f5e"
+VAR _c10 = "#2a0f4e"
+
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#ffffff;padding:10px 16px 8px;width:100%;box-sizing:border-box'>" &
+"<div style='text-align:center;color:#333;font-size:16px;font-weight:700;margin-bottom:12px'>DISTRIBUCION DE ASESORES POR RANGO DE EFECTIVIDAD AGENCIA</div>" &
+"<svg width='100%' viewBox='0 0 500 160' xmlns='http://www.w3.org/2000/svg'>" &
+"<rect x='" & _x1  & "' y='" & (_base-_H1)  & "' width='" & _bW & "' height='" & _H1  & "' fill='" & _c1  & "' rx='2'/>" &
+"<rect x='" & _x2  & "' y='" & (_base-_H2)  & "' width='" & _bW & "' height='" & _H2  & "' fill='" & _c2  & "' rx='2'/>" &
+"<rect x='" & _x3  & "' y='" & (_base-_H3)  & "' width='" & _bW & "' height='" & _H3  & "' fill='" & _c3  & "' rx='2'/>" &
+"<rect x='" & _x4  & "' y='" & (_base-_H4)  & "' width='" & _bW & "' height='" & _H4  & "' fill='" & _c4  & "' rx='2'/>" &
+"<rect x='" & _x5  & "' y='" & (_base-_H5)  & "' width='" & _bW & "' height='" & _H5  & "' fill='" & _c5  & "' rx='2'/>" &
+"<rect x='" & _x6  & "' y='" & (_base-_H6)  & "' width='" & _bW & "' height='" & _H6  & "' fill='" & _c6  & "' rx='2'/>" &
+"<rect x='" & _x7  & "' y='" & (_base-_H7)  & "' width='" & _bW & "' height='" & _H7  & "' fill='" & _c7  & "' rx='2'/>" &
+"<rect x='" & _x8  & "' y='" & (_base-_H8)  & "' width='" & _bW & "' height='" & _H8  & "' fill='" & _c8  & "' rx='2'/>" &
+"<rect x='" & _x9  & "' y='" & (_base-_H9)  & "' width='" & _bW & "' height='" & _H9  & "' fill='" & _c9  & "' rx='2'/>" &
+"<rect x='" & _x10 & "' y='" & (_base-_H10) & "' width='" & _bW & "' height='" & _H10 & "' fill='" & _c10 & "' rx='2'/>" &
+"<text x='" & (_x1 +_bW/2) & "' y='" & IF(_H1  < 20, _base-_H1 -5, _base-_H1 +14) & "' text-anchor='middle' fill='" & IF(_H1  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R1  & "</text>" &
+"<text x='" & (_x2 +_bW/2) & "' y='" & IF(_H2  < 20, _base-_H2 -5, _base-_H2 +14) & "' text-anchor='middle' fill='" & IF(_H2  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R2  & "</text>" &
+"<text x='" & (_x3 +_bW/2) & "' y='" & IF(_H3  < 20, _base-_H3 -5, _base-_H3 +14) & "' text-anchor='middle' fill='" & IF(_H3  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R3  & "</text>" &
+"<text x='" & (_x4 +_bW/2) & "' y='" & IF(_H4  < 20, _base-_H4 -5, _base-_H4 +14) & "' text-anchor='middle' fill='" & IF(_H4  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R4  & "</text>" &
+"<text x='" & (_x5 +_bW/2) & "' y='" & IF(_H5  < 20, _base-_H5 -5, _base-_H5 +14) & "' text-anchor='middle' fill='" & IF(_H5  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R5  & "</text>" &
+"<text x='" & (_x6 +_bW/2) & "' y='" & IF(_H6  < 20, _base-_H6 -5, _base-_H6 +14) & "' text-anchor='middle' fill='" & IF(_H6  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R6  & "</text>" &
+"<text x='" & (_x7 +_bW/2) & "' y='" & IF(_H7  < 20, _base-_H7 -5, _base-_H7 +14) & "' text-anchor='middle' fill='" & IF(_H7  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R7  & "</text>" &
+"<text x='" & (_x8 +_bW/2) & "' y='" & IF(_H8  < 20, _base-_H8 -5, _base-_H8 +14) & "' text-anchor='middle' fill='" & IF(_H8  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R8  & "</text>" &
+"<text x='" & (_x9 +_bW/2) & "' y='" & IF(_H9  < 20, _base-_H9 -5, _base-_H9 +14) & "' text-anchor='middle' fill='" & IF(_H9  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R9  & "</text>" &
+"<text x='" & (_x10+_bW/2) & "' y='" & IF(_H10 < 20, _base-_H10-5, _base-_H10+14) & "' text-anchor='middle' fill='" & IF(_H10 < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R10 & "</text>" &
+"<line x1='20' y1='" & _base & "' x2='480' y2='" & _base & "' stroke='#dddddd' stroke-width='1'/>" &
+"<text x='" & (_x1 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>0-10%</text>" &
+"<text x='" & (_x2 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>10-20%</text>" &
+"<text x='" & (_x3 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>20-30%</text>" &
+"<text x='" & (_x4 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>30-40%</text>" &
+"<text x='" & (_x5 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>40-50%</text>" &
+"<text x='" & (_x6 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>50-60%</text>" &
+"<text x='" & (_x7 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>60-70%</text>" &
+"<text x='" & (_x8 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>70-80%</text>" &
+"<text x='" & (_x9 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>80-90%</text>" &
+"<text x='" & (_x10+_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>90-100%</text>" &
+"</svg>" &
+"<div style='text-align:right;color:#000000;font-size:18px;margin-top:2px'>Total asesores: " & _Total & "</div>" &
+"</div>"
+
+-- HTML_Histograma_Efectividad_callcenter  ·  tabla Medidas
+HTML_Histograma_Efectividad_callcenter =
+VAR _Tabla =
+    ADDCOLUMNS(
+        CALCULATETABLE(
+            VALUES('tickets_deserciones'[Agent]),
+            'tickets_deserciones'[Departamento] = "CallCenter",
+            'tickets_deserciones'[es_excluido] = FALSE()
+        ),
+        "@efectividad",
+        DIVIDE(
+            CALCULATE(
+                COUNTROWS('tickets_deserciones'),
+                'tickets_deserciones'[Retencion] = "SI",
+                'tickets_deserciones'[es_excluido] = FALSE(),
+                'tickets_deserciones'[Departamento] = "CallCenter"
+            ),
+            CALCULATE(
+                COUNTROWS('tickets_deserciones'),
+                'tickets_deserciones'[es_excluido] = FALSE(),
+                'tickets_deserciones'[Departamento] = "CallCenter"
+            ),
+            0
+        )
+    )
+
+VAR _R1  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0   && [@efectividad] < 0.1))
+VAR _R2  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.1 && [@efectividad] < 0.2))
+VAR _R3  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.2 && [@efectividad] < 0.3))
+VAR _R4  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.3 && [@efectividad] < 0.4))
+VAR _R5  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.4 && [@efectividad] < 0.5))
+VAR _R6  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.5 && [@efectividad] < 0.6))
+VAR _R7  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.6 && [@efectividad] < 0.7))
+VAR _R8  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.7 && [@efectividad] < 0.8))
+VAR _R9  = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.8 && [@efectividad] < 0.9))
+VAR _R10 = COUNTROWS(FILTER(_Tabla, [@efectividad] >= 0.9 && [@efectividad] <= 1))
+
+VAR _Max   = MAXX({_R1,_R2,_R3,_R4,_R5,_R6,_R7,_R8,_R9,_R10}, [Value])
+VAR _Total = _R1+_R2+_R3+_R4+_R5+_R6+_R7+_R8+_R9+_R10
+
+VAR _H1  = IF(_Max > 0, DIVIDE(_R1,  _Max) * 120, 0)
+VAR _H2  = IF(_Max > 0, DIVIDE(_R2,  _Max) * 120, 0)
+VAR _H3  = IF(_Max > 0, DIVIDE(_R3,  _Max) * 120, 0)
+VAR _H4  = IF(_Max > 0, DIVIDE(_R4,  _Max) * 120, 0)
+VAR _H5  = IF(_Max > 0, DIVIDE(_R5,  _Max) * 120, 0)
+VAR _H6  = IF(_Max > 0, DIVIDE(_R6,  _Max) * 120, 0)
+VAR _H7  = IF(_Max > 0, DIVIDE(_R7,  _Max) * 120, 0)
+VAR _H8  = IF(_Max > 0, DIVIDE(_R8,  _Max) * 120, 0)
+VAR _H9  = IF(_Max > 0, DIVIDE(_R9,  _Max) * 120, 0)
+VAR _H10 = IF(_Max > 0, DIVIDE(_R10, _Max) * 120, 0)
+
+VAR _bW   = 34
+VAR _gap  = 12
+VAR _base = 130
+
+VAR _x1  = 20
+VAR _x2  = _x1  + _bW + _gap
+VAR _x3  = _x2  + _bW + _gap
+VAR _x4  = _x3  + _bW + _gap
+VAR _x5  = _x4  + _bW + _gap
+VAR _x6  = _x5  + _bW + _gap
+VAR _x7  = _x6  + _bW + _gap
+VAR _x8  = _x7  + _bW + _gap
+VAR _x9  = _x8  + _bW + _gap
+VAR _x10 = _x9  + _bW + _gap
+
+VAR _c1  = "#c9a8e8"
+VAR _c2  = "#b890d8"
+VAR _c3  = "#a478c8"
+VAR _c4  = "#9060b8"
+VAR _c5  = "#7b4fa6"
+VAR _c6  = "#6a3d96"
+VAR _c7  = "#5a2d86"
+VAR _c8  = "#4a1e76"
+VAR _c9  = "#3b1f5e"
+VAR _c10 = "#2a0f4e"
+
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#ffffff;padding:10px 16px 8px;width:100%;box-sizing:border-box'>" &
+"<div style='text-align:center;color:#333;font-size:16px;font-weight:700;margin-bottom:12px'>DISTRIBUCION DE ASESORES POR RANGO DE EFECTIVIDAD CALL CENTER</div>" &
+"<svg width='100%' viewBox='0 0 500 160' xmlns='http://www.w3.org/2000/svg'>" &
+"<rect x='" & _x1  & "' y='" & (_base-_H1)  & "' width='" & _bW & "' height='" & _H1  & "' fill='" & _c1  & "' rx='2'/>" &
+"<rect x='" & _x2  & "' y='" & (_base-_H2)  & "' width='" & _bW & "' height='" & _H2  & "' fill='" & _c2  & "' rx='2'/>" &
+"<rect x='" & _x3  & "' y='" & (_base-_H3)  & "' width='" & _bW & "' height='" & _H3  & "' fill='" & _c3  & "' rx='2'/>" &
+"<rect x='" & _x4  & "' y='" & (_base-_H4)  & "' width='" & _bW & "' height='" & _H4  & "' fill='" & _c4  & "' rx='2'/>" &
+"<rect x='" & _x5  & "' y='" & (_base-_H5)  & "' width='" & _bW & "' height='" & _H5  & "' fill='" & _c5  & "' rx='2'/>" &
+"<rect x='" & _x6  & "' y='" & (_base-_H6)  & "' width='" & _bW & "' height='" & _H6  & "' fill='" & _c6  & "' rx='2'/>" &
+"<rect x='" & _x7  & "' y='" & (_base-_H7)  & "' width='" & _bW & "' height='" & _H7  & "' fill='" & _c7  & "' rx='2'/>" &
+"<rect x='" & _x8  & "' y='" & (_base-_H8)  & "' width='" & _bW & "' height='" & _H8  & "' fill='" & _c8  & "' rx='2'/>" &
+"<rect x='" & _x9  & "' y='" & (_base-_H9)  & "' width='" & _bW & "' height='" & _H9  & "' fill='" & _c9  & "' rx='2'/>" &
+"<rect x='" & _x10 & "' y='" & (_base-_H10) & "' width='" & _bW & "' height='" & _H10 & "' fill='" & _c10 & "' rx='2'/>" &
+"<text x='" & (_x1 +_bW/2) & "' y='" & IF(_H1  < 20, _base-_H1 -5, _base-_H1 +14) & "' text-anchor='middle' fill='" & IF(_H1  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R1  & "</text>" &
+"<text x='" & (_x2 +_bW/2) & "' y='" & IF(_H2  < 20, _base-_H2 -5, _base-_H2 +14) & "' text-anchor='middle' fill='" & IF(_H2  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R2  & "</text>" &
+"<text x='" & (_x3 +_bW/2) & "' y='" & IF(_H3  < 20, _base-_H3 -5, _base-_H3 +14) & "' text-anchor='middle' fill='" & IF(_H3  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R3  & "</text>" &
+"<text x='" & (_x4 +_bW/2) & "' y='" & IF(_H4  < 20, _base-_H4 -5, _base-_H4 +14) & "' text-anchor='middle' fill='" & IF(_H4  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R4  & "</text>" &
+"<text x='" & (_x5 +_bW/2) & "' y='" & IF(_H5  < 20, _base-_H5 -5, _base-_H5 +14) & "' text-anchor='middle' fill='" & IF(_H5  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R5  & "</text>" &
+"<text x='" & (_x6 +_bW/2) & "' y='" & IF(_H6  < 20, _base-_H6 -5, _base-_H6 +14) & "' text-anchor='middle' fill='" & IF(_H6  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R6  & "</text>" &
+"<text x='" & (_x7 +_bW/2) & "' y='" & IF(_H7  < 20, _base-_H7 -5, _base-_H7 +14) & "' text-anchor='middle' fill='" & IF(_H7  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R7  & "</text>" &
+"<text x='" & (_x8 +_bW/2) & "' y='" & IF(_H8  < 20, _base-_H8 -5, _base-_H8 +14) & "' text-anchor='middle' fill='" & IF(_H8  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R8  & "</text>" &
+"<text x='" & (_x9 +_bW/2) & "' y='" & IF(_H9  < 20, _base-_H9 -5, _base-_H9 +14) & "' text-anchor='middle' fill='" & IF(_H9  < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R9  & "</text>" &
+"<text x='" & (_x10+_bW/2) & "' y='" & IF(_H10 < 20, _base-_H10-5, _base-_H10+14) & "' text-anchor='middle' fill='" & IF(_H10 < 20, "#333", "#fff") & "' font-size='10' font-family='Segoe UI' font-weight='700'>" & _R10 & "</text>" &
+"<line x1='20' y1='" & _base & "' x2='480' y2='" & _base & "' stroke='#dddddd' stroke-width='1'/>" &
+"<text x='" & (_x1 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>0-10%</text>" &
+"<text x='" & (_x2 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>10-20%</text>" &
+"<text x='" & (_x3 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>20-30%</text>" &
+"<text x='" & (_x4 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>30-40%</text>" &
+"<text x='" & (_x5 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>40-50%</text>" &
+"<text x='" & (_x6 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>50-60%</text>" &
+"<text x='" & (_x7 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>60-70%</text>" &
+"<text x='" & (_x8 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>70-80%</text>" &
+"<text x='" & (_x9 +_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>80-90%</text>" &
+"<text x='" & (_x10+_bW/2) & "' y='" & (_base+14) & "' text-anchor='middle' fill='#000' font-size='8' font-family='Segoe UI'>90-100%</text>" &
+"</svg>" &
+"<div style='text-align:right;color:#000000;font-size:18px;margin-top:2px'>Total asesores: " & _Total & "</div>" &
+"</div>"
+
+-- Cumplimiento_Num  ·  tabla Medidas
+Cumplimiento_Num =
+DIVIDE([Indice retencion], [Meta_Mes])
+
+-- Meta_Mes  ·  tabla Medidas
+Meta_Mes =
+VAR _minFecha = CALCULATE(MIN('Calendar'[Date]))
+VAR _minMes = DATE(YEAR(_minFecha), MONTH(_minFecha), 1)
+VAR _maxMes = EOMONTH(_minFecha, 0)
+RETURN
+CALCULATE(
+    MAX('vw_file_presupuesto_retenciones'[META_INDICE_RETENCION]),
+    ALL('Calendar'),
+    'vw_file_presupuesto_retenciones'[FECHA_EVALUACION] >= _minMes,
+    'vw_file_presupuesto_retenciones'[FECHA_EVALUACION] <= _maxMes,
+    'vw_file_presupuesto_retenciones'[TIPO] = "Agencia"
+)
+
+-- Pct_Motivo  ·  tabla Medidas
+Pct_Motivo =
+DIVIDE(
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[Retencion] = "SI",
+        'tickets_deserciones'[es_excluido] = FALSE()
+    ),
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        ALL('tickets_deserciones'[Motivo_Real]),
+        'tickets_deserciones'[Retencion] = "SI",
+        'tickets_deserciones'[es_excluido] = FALSE()
+    )
+)
+
+-- Total_solicitudes_Agencia  ·  tabla Medidas
+Total_solicitudes_Agencia =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Departamento] = "Agencia",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_solicitudes_CallCenter  ·  tabla Medidas
+Total_solicitudes_CallCenter =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Departamento] = "CallCenter",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_no_retenidos_Agencia  ·  tabla Medidas
+Total_no_retenidos_Agencia =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "NO",
+    'tickets_deserciones'[Departamento] = "Agencia",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_no_retenidos_CallCenter  ·  tabla Medidas
+Total_no_retenidos_CallCenter =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "NO",
+    'tickets_deserciones'[Departamento] = "CallCenter",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_retenidos_Agencia  ·  tabla Medidas
+Total_retenidos_Agencia =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "SI",
+    'tickets_deserciones'[Departamento] = "Agencia",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_retenidos_CallCenter  ·  tabla Medidas
+Total_retenidos_CallCenter =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "SI",
+    'tickets_deserciones'[Departamento] = "CallCenter",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_no_retenidos_R1  ·  tabla Medidas
+Total_no_retenidos_R1 =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "NO",
+    'tickets_deserciones'[Region] = "Region 1",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_no_retenidos_R2  ·  tabla Medidas
+Total_no_retenidos_R2 =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "NO",
+    'tickets_deserciones'[Region] = "Region 2",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_retenidos_R1  ·  tabla Medidas
+Total_retenidos_R1 =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "SI",
+    'tickets_deserciones'[Region] = "Region 1",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_retenidos_R2  ·  tabla Medidas
+Total_retenidos_R2 =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Retencion] = "SI",
+    'tickets_deserciones'[Region] = "Region 2",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_solicitudes_R1  ·  tabla Medidas
+Total_solicitudes_R1 =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Region] = "Region 1",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Total_solicitudes_R2  ·  tabla Medidas
+Total_solicitudes_R2 =
+CALCULATE(
+    COUNTROWS('tickets_deserciones'),
+    'tickets_deserciones'[Region] = "Region 2",
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Cumplimiento_Num_call  ·  tabla Medidas
+Cumplimiento_Num_call =
+DIVIDE([Indice retencion], [Meta_Mes_Call])
+
+-- Pct_Motivo_no_retenido  ·  tabla Medidas
+Pct_Motivo_no_retenido =
+DIVIDE(
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[Retencion] = "NO",
+        'tickets_deserciones'[es_excluido] = FALSE()
+    ),
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        ALL('tickets_deserciones'[Motivo_Real]),
+        'tickets_deserciones'[Retencion] = "NO",
+        'tickets_deserciones'[es_excluido] = FALSE()
+    )
+)
+
+-- Pct_Motivo_solicitudes  ·  tabla Medidas
+Pct_Motivo_solicitudes =
+DIVIDE(
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[es_excluido] = FALSE()
+    ),
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        ALL('tickets_deserciones'[Motivo_Real]),
+        'tickets_deserciones'[es_excluido] = FALSE()
+    )
+)
+
+-- Var_Indice_UltimoMesConDatos  ·  tabla Medidas
+Var_Indice_UltimoMesConDatos =
+VAR _MesActual =
+    MAX('Calendar'[YearMonth])
+
+VAR _UltimoMesConDatos =
+    MAXX(
+        FILTER(
+            ALLSELECTED('Calendar'[YearMonth]),
+            CALCULATE( NOT ISBLANK([Indice retencion]) )
+        ),
+        'Calendar'[YearMonth]
+    )
+
+VAR _Actual = [Indice retencion]
+VAR _Anterior = [Indice_Mes_Anterior]
+
+RETURN
+    IF(
+        _MesActual = _UltimoMesConDatos,
+        IF(
+            ISBLANK(_Actual) || ISBLANK(_Anterior),
+            BLANK(),
+            _Actual - _Anterior
+        ),
+        BLANK()
+    )
+
+-- Indice_Mes_Anterior  ·  tabla Medidas
+Indice_Mes_Anterior =
+VAR _minFecha = MIN('Calendar'[Date])
+VAR _maxFecha = MAX('Calendar'[Date])
+VAR _esMesCompleto = CALCULATE(COUNTROWS('Calendar')) = DAY(EOMONTH(_minFecha, 0))
+VAR _fechaIniAnt = IF(_esMesCompleto,
+    EOMONTH(_minFecha, -1) - DAY(EOMONTH(_minFecha, -1)) + 1,
+    DATE(YEAR(_minFecha), MONTH(_minFecha) - 1, 1))
+VAR _fechaFinAnt = IF(_esMesCompleto,
+    EOMONTH(_minFecha, -1),
+    DATE(YEAR(_maxFecha), MONTH(_maxFecha) - 1, DAY(_maxFecha)))
+RETURN
+CALCULATE(
+    DIVIDE(
+        CALCULATE(COUNTROWS('tickets_deserciones'), 'tickets_deserciones'[Retencion] = "SI"),
+        COUNTROWS('tickets_deserciones'),
+        0
+    ),
+    ALL('Calendar'),
+    'Calendar'[Date] >= _fechaIniAnt,
+    'Calendar'[Date] <= _fechaFinAnt,
+    'tickets_deserciones'[es_excluido] = FALSE()
+)
+
+-- Indice retencion_1  ·  tabla Medidas
+Indice retencion_1 =
+VAR _total =
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        'tickets_deserciones'[es_excluido] = FALSE()
+    )
+VAR _retenidos =
+    CALCULATE(
+        COUNTROWS('tickets_deserciones'),
+        FILTER(
+            'tickets_deserciones',
+            'tickets_deserciones'[Retencion] = "SI"
+                && 'tickets_deserciones'[es_excluido] = FALSE()
+        )
+    )
+RETURN
+    IF(
+        _total = 0,
+        BLANK(),
+        DIVIDE(COALESCE(_retenidos,0), _total, 0)
+    )
+
+-- Meta_Mes_Call  ·  tabla Medidas
+Meta_Mes_Call =
+IF(
+    ISINSCOPE(tickets_deserciones[Ciudad_mod]),
+    VAR _minFecha = CALCULATE(MIN('Calendar'[Date]))
+    VAR _minMes = DATE(YEAR(_minFecha), MONTH(_minFecha), 1)
+    VAR _maxMes = EOMONTH(_minFecha, 0)
+    RETURN
+        CALCULATE(
+            MAX('vw_file_presupuesto_retenciones'[META_INDICE_RETENCION]),
+            ALL('Calendar'),
+            'vw_file_presupuesto_retenciones'[FECHA_EVALUACION] >= _minMes,
+            'vw_file_presupuesto_retenciones'[FECHA_EVALUACION] <= _maxMes,
+            'vw_file_presupuesto_retenciones'[TIPO] = "CallCenter"
+        ),
+    BLANK()
+)
+
+-- HRet_Total_Retenidos  ·  tabla Medidas
+HRet_Total_Retenidos =
+DISTINCTCOUNT('retenciones_beneficios'[Cuenta])
+
+-- HRet_Total_Solicitudes  ·  tabla Medidas
+HRet_Total_Solicitudes =
+VAR _Old = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _New = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN _Old + _New
+
+-- HRet_Clientes_Ganan  ·  tabla Medidas
+HRet_Clientes_Ganan =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _Clientes =
+    ADDCOLUMNS(
+        CALCULATETABLE(
+            VALUES('retenciones_beneficios'[Cuenta]),
+            'retenciones_beneficios'[es_excluido] = FALSE(),
+            NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]),
+            KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+        ),
+        "_inc",
+        VAR _f = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+        RETURN IF(NOT ISBLANK(_f), CALCULATE(MAX('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _f, KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)))
+    )
+RETURN
+COUNTROWS(FILTER(_Clientes, NOT ISBLANK([_inc]) && [_inc] > 0.01))
+
+-- HRet_Clientes_Pierden  ·  tabla Medidas
+HRet_Clientes_Pierden =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _Clientes =
+    ADDCOLUMNS(
+        CALCULATETABLE(
+            VALUES('retenciones_beneficios'[Cuenta]),
+            'retenciones_beneficios'[es_excluido] = FALSE(),
+            NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]),
+            KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+        ),
+        "_inc",
+        VAR _f = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+        RETURN IF(NOT ISBLANK(_f), CALCULATE(MAX('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _f, KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)))
+    )
+RETURN
+COUNTROWS(FILTER(_Clientes, NOT ISBLANK([_inc]) && [_inc] < -0.01))
+
+-- HRet_Clientes_Mantienen  ·  tabla Medidas
+HRet_Clientes_Mantienen =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _Clientes =
+    ADDCOLUMNS(
+        CALCULATETABLE(
+            VALUES('retenciones_beneficios'[Cuenta]),
+            'retenciones_beneficios'[es_excluido] = FALSE(),
+            NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]),
+            KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+        ),
+        "_inc",
+        VAR _f = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+        RETURN IF(NOT ISBLANK(_f), CALCULATE(MAX('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _f, KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)))
+    )
+RETURN
+COUNTROWS(FILTER(_Clientes, NOT ISBLANK([_inc]) && [_inc] >= -0.01 && [_inc] <= 0.01))
+
+-- HRet_Facturacion_Actual  ·  tabla Medidas
+HRet_Facturacion_Actual =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _Old = CALCULATE(
+    SUMX(FILTER('retenciones_beneficios', NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL])), 'retenciones_beneficios'[VALOR_PLAN_ACTUAL]),
+    'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)),
+    KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+)
+VAR _NewAccounts = CALCULATETABLE(
+    VALUES('retenciones_beneficios'[Cuenta]),
+    'retenciones_beneficios'[es_excluido] = FALSE(),
+    KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)),
+    KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+)
+VAR _New = SUMX(
+    _NewAccounts,
+    VAR _f = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+    RETURN IF(NOT ISBLANK(_f), CALCULATE(MAX('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _f, KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)))
+)
+RETURN _Old + _New
+
+-- HRet_Facturacion_Anterior  ·  tabla Medidas
+HRet_Facturacion_Anterior =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _Old = CALCULATE(
+    SUMX(FILTER('retenciones_beneficios', NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO])), 'retenciones_beneficios'[VALOR_PLAN_ANTIGUO]),
+    'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)),
+    KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+)
+VAR _NewAccounts = CALCULATETABLE(
+    VALUES('retenciones_beneficios'[Cuenta]),
+    'retenciones_beneficios'[es_excluido] = FALSE(),
+    KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)),
+    KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+)
+VAR _New = SUMX(
+    _NewAccounts,
+    VAR _f = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+    RETURN IF(NOT ISBLANK(_f), CALCULATE(MAX('retenciones_beneficios'[VALOR_PLAN_ANTIGUO]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _f, KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)))
+)
+RETURN _Old + _New
+
+-- HRet_Costo_Retencion  ·  tabla Medidas
+HRet_Costo_Retencion =
+[HRet_Facturacion_Actual] - [HRet_Facturacion_Anterior]
+
+-- HRet_ARPU_Actual  ·  tabla Medidas
+HRet_ARPU_Actual =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _OldDen = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _NewDen = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+RETURN DIVIDE([HRet_Facturacion_Actual], _OldDen + _NewDen, 0)
+
+-- HRet_ARPU_Anterior  ·  tabla Medidas
+HRet_ARPU_Anterior =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _OldDen = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _NewDen = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+RETURN DIVIDE([HRet_Facturacion_Anterior], _OldDen + _NewDen, 0)
+
+-- HRet_Diferencia_ARPU  ·  tabla Medidas
+HRet_Diferencia_ARPU =
+[HRet_ARPU_Actual] - [HRet_ARPU_Anterior]
+
+-- HRet_Valor_Total_Retenido  ·  tabla Medidas
+HRet_Valor_Total_Retenido =
+VAR _Old = CALCULATE(
+    VAR _con_plan = SUMX(FILTER('retenciones_beneficios', NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL])), 'retenciones_beneficios'[VALOR_PLAN_ACTUAL])
+    VAR _sin_plan = SUMX(FILTER('retenciones_beneficios', ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL])), 'retenciones_beneficios'[ARPU_INTERNET])
+    RETURN _con_plan + IF(NOT ISBLANK(_sin_plan), _sin_plan, 0),
+    'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1))
+)
+VAR _NewAccounts = CALCULATETABLE(VALUES('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _New = SUMX(
+    _NewAccounts,
+    VAR _tieneP = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1))) > 0
+    VAR _fP = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+    VAR _vP = CALCULATE(MAX('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _fP)
+    VAR _fA = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[ARPU_INTERNET]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+    VAR _vA = CALCULATE(MAX('retenciones_beneficios'[ARPU_INTERNET]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _fA)
+    RETURN IF(_tieneP, _vP, _vA)
+)
+RETURN _Old + _New
+
+-- HRet_ARPU_Retenido  ·  tabla Medidas
+HRet_ARPU_Retenido =
+VAR _OldDen = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _NewDen = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN DIVIDE([HRet_Valor_Total_Retenido], _OldDen + _NewDen, 0)
+
+-- HRet_Valor_Gana  ·  tabla Medidas
+HRet_Valor_Gana =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _Clientes =
+    ADDCOLUMNS(
+        CALCULATETABLE(
+            VALUES('retenciones_beneficios'[Cuenta]),
+            'retenciones_beneficios'[es_excluido] = FALSE(),
+            NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]),
+            KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+        ),
+        "_inc",
+        VAR _f = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+        RETURN IF(NOT ISBLANK(_f), CALCULATE(MAX('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _f, KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)))
+    )
+RETURN
+SUMX(FILTER(_Clientes, NOT ISBLANK([_inc]) && [_inc] > 0.01), [_inc])
+
+-- HRet_Valor_Pierde  ·  tabla Medidas
+HRet_Valor_Pierde =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _Clientes =
+    ADDCOLUMNS(
+        CALCULATETABLE(
+            VALUES('retenciones_beneficios'[Cuenta]),
+            'retenciones_beneficios'[es_excluido] = FALSE(),
+            NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]),
+            KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)
+        ),
+        "_inc",
+        VAR _f = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+        RETURN IF(NOT ISBLANK(_f), CALCULATE(MAX('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _f, KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)))
+    )
+RETURN
+SUMX(FILTER(_Clientes, NOT ISBLANK([_inc]) && [_inc] < -0.01), [_inc])
+
+-- HRet_Uso_Herramienta  ·  tabla Medidas
+HRet_Uso_Herramienta =
+VAR _Old = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _New = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN _Old + _New
+
+-- HRet_Pct_Herramienta_1  ·  tabla Medidas
+HRet_Pct_Herramienta_1 =
+VAR _numOld = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _numNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _denOld = CALCULATE(COUNTROWS('retenciones_beneficios'), ALL('retenciones_beneficios'[Herramienta_Normalizada]), ALL('retenciones_beneficios'[beneficios]), ALL('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _denNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), ALL('retenciones_beneficios'[Herramienta_Normalizada]), ALL('retenciones_beneficios'[beneficios]), ALL('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN DIVIDE(_numOld + _numNew, _denOld + _denNew, 0)
+
+-- HRet_Pct_Motivo_Total  ·  tabla Medidas
+HRet_Pct_Motivo_Total =
+VAR _numOld = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _numNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _denOld = CALCULATE(COUNTROWS('retenciones_beneficios'), ALL('retenciones_beneficios'[MOTIVO_REAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _denNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), ALL('retenciones_beneficios'[MOTIVO_REAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN DIVIDE(_numOld + _numNew, _denOld + _denNew, 0)
+
+-- HRet_Pct_Beneficio_vs_Motivo_1  ·  tabla Medidas
+HRet_Pct_Beneficio_vs_Motivo_1 =
+VAR _numOld = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _numNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _denOld = CALCULATE(COUNTROWS('retenciones_beneficios'), ALL('retenciones_beneficios'[beneficio_mod]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _denNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), ALL('retenciones_beneficios'[beneficio_mod]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN DIVIDE(_numOld + _numNew, _denOld + _denNew, 0)
+
+-- HRet_Resumen_Clientes  ·  tabla Medidas
+HRet_Resumen_Clientes =
+VAR _fila = SELECTEDVALUE('_Metricas_Resumen'[OrdenFila], 0)
+VAR _conOferta = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE())
+VAR _OldClientes = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Ticket]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _NewClientes = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN
+SWITCH(
+    _fila,
+    1, _OldClientes + _NewClientes,
+    4, IF(_conOferta > 0, _conOferta, BLANK()),
+    5, IF(_conOferta > 0, [HRet_Clientes_Ganan], BLANK()),
+    6, IF(_conOferta > 0, [HRet_Clientes_Pierden], BLANK()),
+    7, IF(_conOferta > 0, [HRet_Clientes_Mantienen], BLANK()),
+    BLANK()
+)
+
+-- HRet_Resumen_Pesos  ·  tabla Medidas
+HRet_Resumen_Pesos =
+VAR _fila = SELECTEDVALUE('_Metricas_Resumen'[OrdenFila], 0)
+VAR _conOfertaOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _conOfertaNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _conOferta = _conOfertaOld + _conOfertaNew
+VAR _pctOferta = DIVIDE(_conOferta, [HRet_Total_Retenidos], 0)
+VAR _pctGana = DIVIDE([HRet_Clientes_Ganan], _conOferta, 0)
+VAR _pctPierde = DIVIDE([HRet_Clientes_Pierden], _conOferta, 0)
+VAR _pctMantiene = DIVIDE([HRet_Clientes_Mantienen], _conOferta, 0)
+VAR _totalConOfertaSinFiltro = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1))) + CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _totalRetenidosSinFiltro = CALCULATE(COUNTROWS('retenciones_beneficios'), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1))) + CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _currentTotal = [HRet_Total_Retenidos]
+VAR _hayFiltroHerramienta = _totalRetenidosSinFiltro <> _currentTotal
+VAR _pctVsConOferta = DIVIDE(_currentTotal, _totalConOfertaSinFiltro, 0)
+RETURN
+SWITCH(
+    _fila,
+    1, IF(_hayFiltroHerramienta, _pctVsConOferta, BLANK()),
+    4, _pctOferta,
+    5, _pctGana,
+    6, _pctPierde,
+    7, _pctMantiene,
+    BLANK()
+)
+
+-- HRet_Resumen_Valores  ·  tabla Medidas
+HRet_Resumen_Valores =
+VAR _fila = SELECTEDVALUE('_Metricas_Resumen'[OrdenFila], 0)
+RETURN
+SWITCH(
+    _fila,
+    2,  [HRet_Valor_Total_Retenido],
+    3,  [HRet_ARPU_Retenido],
+    5,  [HRet_Valor_Gana],
+    6,  [HRet_Valor_Pierde],
+    8,  [HRet_Facturacion_Anterior],
+    9,  [HRet_Facturacion_Actual],
+    10, [HRet_Costo_Retencion],
+    11, [HRet_ARPU_Anterior],
+    12, [HRet_ARPU_Actual],
+    13, [HRet_Diferencia_ARPU],
+    BLANK()
+)
+
+-- HRet_Label_Herramienta  ·  tabla Medidas
+HRet_Label_Herramienta =
+VAR _cntOld = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _cntNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _cnt = _cntOld + _cntNew
+VAR _totOld = CALCULATE(COUNTROWS('retenciones_beneficios'), ALL('retenciones_beneficios'[Herramienta_Normalizada]), ALL('retenciones_beneficios'[Validacion_Oferta_CRM_Tytan]), ALL('retenciones_beneficios'[beneficios]), ALL('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _totNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), ALL('retenciones_beneficios'[Herramienta_Normalizada]), ALL('retenciones_beneficios'[Validacion_Oferta_CRM_Tytan]), ALL('retenciones_beneficios'[beneficios]), ALL('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _pct = DIVIDE(_cnt, _totOld + _totNew, 0)
+RETURN FORMAT(_cnt, "#,0") & "  |  " & FORMAT(_pct, "0.0%")
+
+-- HTML_Card_ConOferta  ·  tabla Medidas
+HTML_Card_ConOferta =
+VAR _conOfertaOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _conOfertaNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _conOferta = _conOfertaOld + _conOfertaNew
+VAR _totalOld = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _totalNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _pct = DIVIDE(_conOferta, _totalOld + _totalNew, 0)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border-radius:8px;border:1px solid #E8DCEA;border-left:4px solid #783E80;padding:14px 16px;box-sizing:border-box;height:100%'>
+  <div style='font-size:16px;color:#111;margin-bottom:4px'>Con oferta aplicada</div>
+  <div style='font-size:38px;font-weight:600;color:#783E80'>" & FORMAT(_conOferta, "#,0") & "</div>
+  <div style='font-size:16px;color:#111;margin-top:4px'>" & FORMAT(_pct, "0%") & " del total retenidos</div>
+</div>"
+
+-- HTML_Card_CostoRetencion  ·  tabla Medidas
+HTML_Card_CostoRetencion =
+VAR _costo = [HRet_Costo_Retencion]
+VAR _color = IF(_costo < 0, "#C0392B", "#1E8449")
+VAR _facAnt = [HRet_Facturacion_Anterior]
+VAR _facAct = [HRet_Facturacion_Actual]
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border-radius:8px;border:1px solid #E8DCEA;border-left:4px solid " & _color & ";padding:14px 16px;box-sizing:border-box;height:100%'>
+  <div style='font-size:16px;color:#111;margin-bottom:4px'>Costo de retención</div>
+  <div style='font-size:36px;font-weight:600;color:" & _color & "'>" & FORMAT(_costo, "$#,##0.00") & "</div>
+  <div style='font-size:16px;color:#111;margin-top:4px'>Ant: " & FORMAT(_facAnt, "$#,##0.00") & " → Act: " & FORMAT(_facAct, "$#,##0.00") & "</div>
+</div>"
+
+-- HTML_Card_DifARPU  ·  tabla Medidas
+HTML_Card_DifARPU =
+VAR _dif = [HRet_Diferencia_ARPU]
+VAR _color = IF(_dif < 0, "#C0392B", "#1E8449")
+VAR _ant = [HRet_ARPU_Anterior]
+VAR _act = [HRet_ARPU_Actual]
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border-radius:8px;border:1px solid #E8DCEA;border-left:4px solid " & _color & ";padding:14px 16px;box-sizing:border-box;height:100%'>
+  <div style='font-size:16px;color:#111;margin-bottom:4px'>Diferencia ARPU</div>
+  <div style='font-size:36px;font-weight:600;color:" & _color & "'>" & FORMAT(_dif, "+$#,##0.00;-$#,##0.00;$0.00") & "</div>
+  <div style='font-size:16px;color:#111;margin-top:4px'>Ant " & FORMAT(_ant, "$#,##0.00") & " → Act " & FORMAT(_act, "$#,##0.00") & "</div>
+</div>"
+
+-- HTML_Card_Gana  ·  tabla Medidas
+HTML_Card_Gana =
+VAR _cnt = [HRet_Clientes_Ganan]
+VAR _val = [HRet_Valor_Gana]
+VAR _denOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _denNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _pct = DIVIDE(_cnt, _denOld + _denNew, 0)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#f7fcf8;border-radius:8px;border:1px solid #d5f0dc;border-left:4px solid #1E8449;padding:14px 16px;box-sizing:border-box;height:100%'>
+  <div style='font-size:15px;font-weight:600;color:#1E8449;margin-bottom:4px'>↑ GANA</div>
+  <div style='font-size:36px;font-weight:600;color:#1E8449'>" & FORMAT(_cnt, "#,0") & "</div>
+  <div style='font-size:16px;color:#111;margin-top:4px'>" & FORMAT(_pct, "0%") & " · " & FORMAT(_val, "+$#,##0.00") & "</div>
+  <div style='font-size:15px;color:#111;margin-top:4px'>Herramientas con incremento</div>
+</div>"
+
+-- HTML_Card_Pierde  ·  tabla Medidas
+HTML_Card_Pierde =
+VAR _cnt = [HRet_Clientes_Pierden]
+VAR _val = [HRet_Valor_Pierde]
+VAR _denOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _denNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _pct = DIVIDE(_cnt, _denOld + _denNew, 0)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fef9f9;border-radius:8px;border:1px solid #fde8e8;border-left:4px solid #C0392B;padding:14px 16px;box-sizing:border-box;height:100%'>
+  <div style='font-size:15px;font-weight:600;color:#C0392B;margin-bottom:4px'>↓ PIERDE</div>
+  <div style='font-size:36px;font-weight:600;color:#C0392B'>" & FORMAT(_cnt, "#,0") & "</div>
+  <div style='font-size:16px;color:#111;margin-top:4px'>" & FORMAT(_pct, "0%") & " · " & FORMAT(_val, "+$#,##0.00;-$#,##0.00;$0.00") & "</div>
+  <div style='font-size:15px;color:#111;margin-top:4px'>Herramientas con disminución</div>
+</div>"
+
+-- HTML_Card_Mantiene  ·  tabla Medidas
+HTML_Card_Mantiene =
+VAR _cnt = [HRet_Clientes_Mantienen]
+VAR _denOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _denNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _pct = DIVIDE(_cnt, _denOld + _denNew, 0)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fafafa;border-radius:8px;border:1px solid #e0e0e0;border-left:4px solid #888;padding:14px 16px;box-sizing:border-box;height:100%'>
+  <div style='font-size:15px;font-weight:600;color:#555;margin-bottom:4px'>= MANTIENE</div>
+  <div style='font-size:36px;font-weight:600;color:#444'>" & FORMAT(_cnt, "#,0") & "</div>
+  <div style='font-size:16px;color:#111;margin-top:4px'>" & FORMAT(_pct, "0%") & " · $0.00</div>
+  <div style='font-size:15px;color:#111;margin-top:4px'>Sin cambio en valor de plan</div>
+</div>"
+
+-- HRet_T1_Valor  ·  tabla Medidas
+HRet_T1_Valor =
+VAR _fila = SELECTEDVALUE('_Metricas_Tabla1'[OrdenFila], 0)
+VAR _total = COUNTROWS('retenciones_beneficios')
+RETURN
+IF(
+    _total = 0,
+    BLANK(),
+    SWITCH(
+        _fila,
+        2, [HRet_T1_Fact_Anterior],
+        3, [HRet_T1_Fact_Actual],
+        4, [HRet_T1_ARPU_Anterior],
+        5, [HRet_T1_ARPU_Actual],
+        6, [HRet_T1_Dif_ARPU],
+        BLANK()
+    )
+)
+
+-- HRet_T2_Cantidad  ·  tabla Medidas
+HRet_T2_Cantidad =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _fila = SELECTEDVALUE('_Metricas_Tabla2'[OrdenFila], 0)
+VAR _OldConOferta = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _NewConOferta = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _conOferta = _OldConOferta + _NewConOferta
+RETURN
+SWITCH(
+    _fila,
+    1, _conOferta,
+    4, IF(_conOferta > 0, [HRet_Clientes_Ganan], BLANK()),
+    5, IF(_conOferta > 0, [HRet_Clientes_Mantienen], BLANK()),
+    6, IF(_conOferta > 0, [HRet_Clientes_Pierden], BLANK()),
+    BLANK()
+)
+
+-- HRet_T2_Valor  ·  tabla Medidas
+HRet_T2_Valor =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _fila = SELECTEDVALUE('_Metricas_Tabla2'[OrdenFila], 0)
+VAR _conOfertaOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _conOfertaNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _conOferta = _conOfertaOld + _conOfertaNew
+RETURN
+SWITCH(
+    _fila,
+    2, [HRet_Facturacion_Anterior],
+    3, [HRet_Facturacion_Actual],
+    4, IF(_conOferta > 0, [HRet_Valor_Gana], BLANK()),
+    6, IF(_conOferta > 0, [HRet_Valor_Pierde], BLANK()),
+    7, [HRet_ARPU_Anterior],
+    8, [HRet_ARPU_Actual],
+    9, [HRet_Diferencia_ARPU],
+    BLANK()
+)
+
+-- HRet_T1_Cantidad  ·  tabla Medidas
+HRet_T1_Cantidad =
+VAR _fila = SELECTEDVALUE('_Metricas_Tabla1'[OrdenFila], 0)
+VAR _OldTotal = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _NewTotal = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _total = _OldTotal + _NewTotal
+RETURN SWITCH(_fila, 1, IF(_total > 0, _total, BLANK()), BLANK())
+
+-- HRet_T1_Fact_Anterior  ·  tabla Medidas
+HRet_T1_Fact_Anterior =
+VAR _Old = CALCULATE(
+    VAR _con_plan = SUMX(FILTER('retenciones_beneficios', NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO])), 'retenciones_beneficios'[VALOR_PLAN_ANTIGUO])
+    VAR _sin_plan = SUMX(FILTER('retenciones_beneficios', ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO])), 'retenciones_beneficios'[ARPU_INTERNET])
+    RETURN _con_plan + IF(NOT ISBLANK(_sin_plan), _sin_plan, 0),
+    'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1))
+)
+VAR _NewAccounts = CALCULATETABLE(VALUES('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _New = SUMX(
+    _NewAccounts,
+    VAR _tieneA = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1))) > 0
+    VAR _fA2 = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ANTIGUO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+    VAR _vA2 = CALCULATE(MAX('retenciones_beneficios'[VALOR_PLAN_ANTIGUO]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _fA2)
+    VAR _fArpu = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[ARPU_INTERNET]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+    VAR _vArpu = CALCULATE(MAX('retenciones_beneficios'[ARPU_INTERNET]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _fArpu)
+    RETURN IF(_tieneA, _vA2, _vArpu)
+)
+RETURN _Old + _New
+
+-- HRet_T1_Fact_Actual  ·  tabla Medidas
+HRet_T1_Fact_Actual =
+VAR _Old = CALCULATE(
+    VAR _con_plan = SUMX(FILTER('retenciones_beneficios', NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL])), 'retenciones_beneficios'[VALOR_PLAN_ACTUAL])
+    VAR _sin_plan = SUMX(FILTER('retenciones_beneficios', ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL])), 'retenciones_beneficios'[ARPU_INTERNET])
+    RETURN _con_plan + IF(NOT ISBLANK(_sin_plan), _sin_plan, 0),
+    'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1))
+)
+VAR _NewAccounts = CALCULATETABLE(VALUES('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+VAR _New = SUMX(
+    _NewAccounts,
+    VAR _tieneP = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1))) > 0
+    VAR _fP = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+    VAR _vP = CALCULATE(MAX('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _fP)
+    VAR _fA = CALCULATE(MAX('retenciones_beneficios'[Fecha_de_Ingreso]), NOT ISBLANK('retenciones_beneficios'[ARPU_INTERNET]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+    VAR _vA = CALCULATE(MAX('retenciones_beneficios'[ARPU_INTERNET]), 'retenciones_beneficios'[Fecha_de_Ingreso] = _fA)
+    RETURN IF(_tieneP, _vP, _vA)
+)
+RETURN _Old + _New
+
+-- HRet_T1_ARPU_Anterior  ·  tabla Medidas
+HRet_T1_ARPU_Anterior =
+VAR _OldDen = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _NewDen = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN DIVIDE([HRet_T1_Fact_Anterior], _OldDen + _NewDen, 0)
+
+-- HRet_T1_ARPU_Actual  ·  tabla Medidas
+HRet_T1_ARPU_Actual =
+VAR _OldDen = CALCULATE(COUNTROWS('retenciones_beneficios'), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)))
+VAR _NewDen = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN DIVIDE([HRet_T1_Fact_Actual], _OldDen + _NewDen, 0)
+
+-- HRet_T1_Dif_ARPU  ·  tabla Medidas
+HRet_T1_Dif_ARPU =
+[HRet_T1_ARPU_Actual] - [HRet_T1_ARPU_Anterior]
+
+-- HRet_T2_Pesos  ·  tabla Medidas
+HRet_T2_Pesos =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _fila = SELECTEDVALUE('_Metricas_Tabla2'[OrdenFila], 0)
+VAR _conOfertaOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _conOfertaNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _conOferta = _conOfertaOld + _conOfertaNew
+VAR _pctGana = DIVIDE([HRet_Clientes_Ganan], _conOferta, 0)
+VAR _pctPierde = DIVIDE([HRet_Clientes_Pierden], _conOferta, 0)
+VAR _pctMantiene = DIVIDE([HRet_Clientes_Mantienen], _conOferta, 0)
+VAR _totalConOferta = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)) + CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _totalConOfertaGlobal = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1))) + CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN
+SWITCH(
+    _fila,
+    1, DIVIDE(_totalConOferta, _totalConOfertaGlobal, 0),
+    4, _pctGana,
+    5, _pctMantiene,
+    6, _pctPierde,
+    BLANK()
+)
+
+-- HRet_T2_Pesos_Total  ·  tabla Medidas
+HRet_T2_Pesos_Total =
+VAR _HerramientasValidas = {"HERRAMIENTA 1","HERRAMIENTA 2","HERRAMIENTA 3","HERRAMIENTA 4","PLANES DE CAPTACION","PLANES DE MIGRACION"}
+VAR _fila = SELECTEDVALUE('_Metricas_Tabla2'[OrdenFila], 0)
+VAR _conOfertaOld = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _conOfertaNew = CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[INCREMENTO]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _conOferta = _conOfertaOld + _conOfertaNew
+VAR _pctGana = DIVIDE([HRet_Clientes_Ganan], _conOferta, 0)
+VAR _pctPierde = DIVIDE([HRet_Clientes_Pierden], _conOferta, 0)
+VAR _pctMantiene = DIVIDE([HRet_Clientes_Mantienen], _conOferta, 0)
+VAR _totalConOferta = CALCULATE(COUNTROWS('retenciones_beneficios'), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas)) + CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), NOT ISBLANK('retenciones_beneficios'[VALOR_PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)), KEEPFILTERS('retenciones_beneficios'[Herramienta_Agrupada] IN _HerramientasValidas))
+VAR _totalGeneral = CALCULATE(COUNTROWS('retenciones_beneficios'), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] < DATE(2026,7,1))) + CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), REMOVEFILTERS('retenciones_beneficios'[Herramienta_Normalizada]), REMOVEFILTERS('retenciones_beneficios'[beneficios]), REMOVEFILTERS('retenciones_beneficios'[PLAN_ACTUAL]), 'retenciones_beneficios'[es_excluido] = FALSE(), KEEPFILTERS('retenciones_beneficios'[Fecha_de_Ingreso] >= DATE(2026,7,1)))
+RETURN
+SWITCH(
+    _fila,
+    1, DIVIDE(_totalConOferta, _totalGeneral, 0),
+    4, _pctGana,
+    5, _pctMantiene,
+    6, _pctPierde,
+    BLANK()
+)
+
+-- Ef1_Total  ·  tabla Medidas
+Ef1_Total =
+IF(HASONEVALUE('_Ef_Tabla1'[Categoria]), CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), TREATAS(VALUES('_Ef_Tabla1'[Categoria]), 'retenciones_beneficios'[Herramienta_Combo_Adicional])), DISTINCTCOUNT('retenciones_beneficios'[Cuenta]))
+
+-- Ef1_Pct  ·  tabla Medidas
+Ef1_Pct =
+DIVIDE([Ef1_Total], CALCULATE([Ef1_Total], ALL('_Ef_Tabla1')))
+
+-- Ef2_H1  ·  tabla Medidas
+Ef2_H1 =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="HERRAMIENTA 1", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_H2  ·  tabla Medidas
+Ef2_H2 =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="HERRAMIENTA 2", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_H3  ·  tabla Medidas
+Ef2_H3 =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="HERRAMIENTA 3", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_H4  ·  tabla Medidas
+Ef2_H4 =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="HERRAMIENTA 4", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_Captacion  ·  tabla Medidas
+Ef2_Captacion =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="PLANES DE CAPTACION", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_Migracion  ·  tabla Medidas
+Ef2_Migracion =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="PLANES DE MIGRACION", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_Total_Ofertas  ·  tabla Medidas
+Ef2_Total_Ofertas =
+[Ef2_H1]+[Ef2_H2]+[Ef2_H3]+[Ef2_H4]+[Ef2_Captacion]+[Ef2_Migracion]
+
+-- Ef2_Otras  ·  tabla Medidas
+Ef2_Otras =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="RETENIDO CON OTRAS HERRAMIENTAS", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_Varias  ·  tabla Medidas
+Ef2_Varias =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), 'retenciones_beneficios'[Herramienta_Combo_Adicional]="RETENIDO CON VARIAS HERRAMIENTAS", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))
+
+-- Ef2_Total_Retenidos  ·  tabla Medidas
+Ef2_Total_Retenidos =
+[Ef2_Total_Ofertas]+[Ef2_Otras]+[Ef2_Varias]
+
+-- Ef2_Pct_Retenido  ·  tabla Medidas
+Ef2_Pct_Retenido =
+DIVIDE([Ef2_Total_Retenidos], CALCULATE([Ef2_Total_Retenidos], ALL('_Ef_Tabla2')))
+
+-- Ef2_No_Retenidos  ·  tabla Medidas
+Ef2_No_Retenidos =
+CALCULATE(DISTINCTCOUNT('tickets_deserciones'[Cuenta]), 'tickets_deserciones'[Retencion]="NO", TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'tickets_deserciones'[Motivo_Real]), TREATAS(VALUES('retenciones_beneficios'[Grupo]), 'tickets_deserciones'[Grupo]))
+
+-- Ef2_Pct_No_Retenido  ·  tabla Medidas
+Ef2_Pct_No_Retenido =
+DIVIDE([Ef2_No_Retenidos], CALCULATE([Ef2_No_Retenidos], ALL('_Ef_Tabla2')))
+
+-- Ef2_Total_Solicitudes  ·  tabla Medidas
+Ef2_Total_Solicitudes =
+[Ef2_Total_Retenidos]+[Ef2_No_Retenidos]
+
+-- Ef2_Pct_Solicitudes  ·  tabla Medidas
+Ef2_Pct_Solicitudes =
+DIVIDE([Ef2_Total_Solicitudes], CALCULATE([Ef2_Total_Solicitudes], ALL('_Ef_Tabla2')))
+
+-- Ef2_Pct_Retencion  ·  tabla Medidas
+Ef2_Pct_Retencion =
+DIVIDE([Ef2_Total_Retenidos], [Ef2_Total_Solicitudes])
+
+-- Ef2_Pct_Ofertas  ·  tabla Medidas
+Ef2_Pct_Ofertas =
+DIVIDE([Ef2_Total_Ofertas], [Ef2_Total_Retenidos])
+
+-- Ef2_Pct_Otras  ·  tabla Medidas
+Ef2_Pct_Otras =
+DIVIDE([Ef2_Otras], [Ef2_Total_Retenidos])
+
+-- Ef2_Pct_Varias  ·  tabla Medidas
+Ef2_Pct_Varias =
+DIVIDE([Ef2_Varias], [Ef2_Total_Retenidos])
+
+-- Ef3_Cuentas  ·  tabla Medidas
+Ef3_Cuentas =
+CALCULATE(DISTINCTCOUNT('retenciones_beneficios'[Cuenta]), TREATAS(VALUES('_Ef_Tabla2'[Motivo_Real]), 'retenciones_beneficios'[Motivo_Real]))

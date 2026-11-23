@@ -1,0 +1,1573 @@
+-- Cant_Cumple_SLA  ·  tabla Medidas
+Cant_Cumple_SLA =
+// Tickets que cumplen SLA (afectacion_total*24 <= SLA)
+// Excluye causas externas igual que Cumple_TRFn
+VAR _ids_excluidos =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        TREATAS( VALUES( excluded[Causa] ), rms_disruptions[causa] )
+    )
+VAR _ids_cumple =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        rms_disruptions[Cumple_SLA_col] = "Cumple"
+    )
+RETURN
+    COUNTROWS( EXCEPT( _ids_cumple, _ids_excluidos ) )
+
+-- Cant_NoCumple_SLA  ·  tabla Medidas
+Cant_NoCumple_SLA =
+
+COUNTROWS(
+    FILTER(
+        rms_disruptions,
+        rms_disruptions[afectacion_total] * 24 > RELATED(SLA[SLA])
+    )
+)
+
+-- Pct_Cumplimiento_SLA  ·  tabla Medidas
+Pct_Cumplimiento_SLA =
+
+DIVIDE(
+    [Cant_Cumple_SLA],
+    [Cant_Cumple_SLA] + [Cant_NoCumple_SLA],
+    0
+)
+
+-- Serv_Afectados_Internet  ·  tabla Medidas
+Serv_Afectados_Internet =
+
+CALCULATE(
+    SUM(rms_disruptions[cantidad]),
+    rms_disruptions[servicio] = "Internet"
+)
+
+-- Serv_Afectados_Telefonia  ·  tabla Medidas
+Serv_Afectados_Telefonia =
+
+CALCULATE(
+    SUM(rms_disruptions[cantidad]),
+    rms_disruptions[servicio] = "Telefonía"
+)
+
+-- Serv_Afectados_Television  ·  tabla Medidas
+Serv_Afectados_Television =
+
+CALCULATE(
+    SUM(rms_disruptions[cantidad]),
+    rms_disruptions[servicio] = "Televisión"
+)
+
+-- Total_Eventos  ·  tabla Medidas
+Total_Eventos =
+VAR _ids_excluidos =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        TREATAS( VALUES( excluded[Causa] ), rms_disruptions[causa] )
+    )
+VAR _todos_ids = VALUES( rms_disruptions[id] )
+VAR _ids_validos = EXCEPT( _todos_ids, _ids_excluidos )
+RETURN
+    COUNTROWS( _ids_validos )
+
+-- Cumple_TRFn  ·  tabla Medidas
+Cumple_TRFn =
+VAR _ids_excluidos =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        TREATAS( VALUES( excluded[Causa] ), rms_disruptions[causa] )
+    )
+VAR _ids_cumple =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        rms_disruptions[Cumple_SLA_col] = "Cumple"
+    )
+RETURN
+    COUNTROWS( EXCEPT( _ids_cumple, _ids_excluidos ) )
+
+-- NoCumple_TRFn  ·  tabla Medidas
+NoCumple_TRFn =
+VAR _ids_excluidos =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        TREATAS( VALUES( excluded[Causa] ), rms_disruptions[causa] )
+    )
+VAR _ids_nocumple =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        rms_disruptions[Cumple_SLA_col] = "No cumple"
+    )
+RETURN
+    COUNTROWS( EXCEPT( _ids_nocumple, _ids_excluidos ) )
+
+-- Pct_TRFn  ·  tabla Medidas
+Pct_TRFn =
+DIVIDE( [Cumple_TRFn], [Total_Eventos], BLANK() )
+
+-- Pct_Serv_Internet  ·  tabla Medidas
+Pct_Serv_Internet =
+VAR _internet = CALCULATE( SUM( rms_disruptions[cantidad] ), rms_disruptions[servicio] = "Internet" )
+VAR _total    = SUM( rms_disruptions[cantidad] )
+RETURN
+    IF(
+        _total = 0 || ISBLANK( _total ),
+        "",
+        FORMAT( DIVIDE( _internet, _total, 0 ), "0.00%" )
+    )
+
+-- Pct_Serv_Telefonia  ·  tabla Medidas
+Pct_Serv_Telefonia =
+VAR _tel   = CALCULATE( SUM( rms_disruptions[cantidad] ), rms_disruptions[servicio] = "Telefonía" )
+VAR _total = SUM( rms_disruptions[cantidad] )
+RETURN
+    IF(
+        _total = 0 || ISBLANK( _total ),
+        "",
+        FORMAT( DIVIDE( _tel, _total, 0 ), "0.00%" )
+    )
+
+-- Pct_Serv_Television  ·  tabla Medidas
+Pct_Serv_Television =
+VAR _tv    = CALCULATE( SUM( rms_disruptions[cantidad] ), rms_disruptions[servicio] = "Televisión" )
+VAR _total = SUM( rms_disruptions[cantidad] )
+RETURN
+    IF(
+        _total = 0 || ISBLANK( _total ),
+        "",
+        FORMAT( DIVIDE( _tv, _total, 0 ), "0.00%" )
+    )
+
+-- Afectacion_Ponderada  ·  tabla Medidas
+Afectacion_Ponderada =
+SUMX(
+    rms_disruptions,
+    rms_disruptions[afectacion] * ( rms_disruptions[porcentaje] / 100 )
+)
+
+-- Cant_Eventos_Afectacion  ·  tabla Medidas
+Cant_Eventos_Afectacion =
+// Cantidad de eventos con afectacion > 0, solo Internet
+// Excluye causas externas (tabla excluded) para coherencia con Total_Eventos
+VAR _ids_excluidos =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        TREATAS( VALUES( excluded[Causa] ), rms_disruptions[causa] )
+    )
+VAR _ids_afectacion =
+    CALCULATETABLE(
+        VALUES( rms_disruptions[id] ),
+        rms_disruptions[servicio] = "Internet",
+        rms_disruptions[afectacion] > 0
+    )
+RETURN
+    COUNTROWS( EXCEPT( _ids_afectacion, _ids_excluidos ) )
+
+-- MTBF  ·  tabla Medidas
+MTBF =
+VAR _eventos = [Cant_Eventos_Afectacion]
+RETURN
+    IF(
+        _eventos = 0 || ISBLANK( _eventos ),
+        BLANK(),
+        DIVIDE( 28, _eventos )
+    )
+
+-- Tiempo_Disponible_28d  ·  tabla Medidas
+Tiempo_Disponible_28d =
+28 * 24
+
+-- Afectacion_Ponderada_Horas  ·  tabla Medidas
+Afectacion_Ponderada_Horas =
+// Afectacion ponderada en HORAS para la red en contexto
+// Formula: SUM(afectacion_dias * porcentaje/100) * 24
+// Usa columna 'afectacion' (no afectacion_total) segun requerimiento de Victor
+// Solo servicio Internet segun requerimiento MTBF/Uptime
+CALCULATE(
+    SUMX(
+        rms_disruptions,
+        rms_disruptions[afectacion] * ( rms_disruptions[porcentaje] / 100 )
+    ) * 24,
+    rms_disruptions[servicio] = "Internet"
+)
+
+-- Uptime  ·  tabla Medidas
+Uptime =
+// Uptime = (672h - Afectacion_Ponderada_Horas) / 672h
+// 672h = 28 dias * 24 horas = tiempo total disponible por nodo
+// Se evalua en el contexto de red/nodo que provea el visual
+// Resultado entre 0 y 1 (formato 0.00%)
+VAR _total_h = 28 * 24  -- 672 horas
+VAR _afect_h = [Afectacion_Ponderada_Horas]
+VAR _uptime_raw = DIVIDE( _total_h - _afect_h, _total_h, BLANK() )
+RETURN
+    IF(
+        ISBLANK( _afect_h ),
+        BLANK(),
+        // Clamp entre 0 y 1 para evitar negativos por datos anomalos
+        MAX( 0, MIN( 1, _uptime_raw ) )
+    )
+
+-- Flag_Incumple_MTBF  ·  tabla Medidas
+Flag_Incumple_MTBF =
+VAR _mtbf = [MTBF]
+RETURN
+    IF(
+        ISBLANK( _mtbf ),
+        BLANK(),
+        IF( _mtbf < 7, 1, 0 )
+    )
+
+-- Flag_Incumple_Uptime  ·  tabla Medidas
+Flag_Incumple_Uptime =
+VAR _uptime = [Uptime]
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "" )
+VAR _umbral =
+    SWITCH(
+        _tec,
+        "HFC",  0.995,
+        "GPON", 0.998,
+        0.995  -- default conservador
+    )
+RETURN
+    IF(
+        ISBLANK( _uptime ),
+        BLANK(),
+        IF( _uptime < _umbral, 1, 0 )
+    )
+
+-- Flag_Nodo_Critico  ·  tabla Medidas
+Flag_Nodo_Critico =
+VAR _mtbf_flag   = [Flag_Incumple_MTBF]
+VAR _uptime_flag = [Flag_Incumple_Uptime]
+RETURN
+    IF(
+        ISBLANK( _mtbf_flag ) || ISBLANK( _uptime_flag ),
+        BLANK(),
+        IF( _mtbf_flag = 1 && _uptime_flag = 1, 1, 0 )
+    )
+
+-- Nodos_Incumplen  ·  tabla Medidas
+Nodos_Incumplen =
+// Nodos_Incumplen: redes que incumplen MTBF<7 AND Uptime<umbral
+// en el corte mas reciente disponible en el modelo
+// Nota: los datos tienen cortes mensuales. Para logica de 3 cortes
+// consecutivos se requiere una tabla de historial de flags por red.
+
+VAR _fecha_max = MAXX( CALCULATETABLE( VALUES(rms_disruptions[date]), ALL(rms_disruptions) ), rms_disruptions[date] )
+
+RETURN
+    COUNTROWS(
+        FILTER(
+            CALCULATETABLE( VALUES( rms_disruptions[red] ), ALL(Calendar) ),
+            VAR _r      = rms_disruptions[red]
+            VAR _tec    = CALCULATE(
+                FIRSTNONBLANK( rms_disruptions[tec], 1 ),
+                rms_disruptions[date] = _fecha_max,
+                ALL(Calendar)
+            )
+            VAR _umbral = IF( _tec = "GPON", 0.998, 0.995 )
+            VAR _ah     = CALCULATE(
+                SUMX( rms_disruptions, rms_disruptions[afectacion] * rms_disruptions[porcentaje] / 100 ) * 24,
+                rms_disruptions[servicio] = "Internet",
+                rms_disruptions[date] = _fecha_max,
+                ALL(Calendar)
+            )
+            VAR _nev    = CALCULATE(
+                COUNTROWS( FILTER( rms_disruptions,
+                    rms_disruptions[servicio] = "Internet"
+                    && rms_disruptions[afectacion] > 0 ) ),
+                rms_disruptions[date] = _fecha_max,
+                ALL(Calendar)
+            )
+            VAR _mtbf   = IF( _nev > 0, DIVIDE( 28, _nev ), BLANK() )
+            VAR _upt    = IF( NOT ISBLANK(_ah), MAX(0, (672 - _ah)/672), BLANK() )
+            RETURN
+                NOT ISBLANK(_mtbf)
+                && NOT ISBLANK(_upt)
+                && _mtbf < 7
+                && _upt  < _umbral
+        )
+    )
+
+-- Titulo_Pagina_TRFn  ·  tabla Medidas
+Titulo_Pagina_TRFn =
+VAR _tec  = SELECTEDVALUE( rms_disruptions[tec],  "TODAS LAS TECNOLOGÍAS" )
+VAR _tipo = SELECTEDVALUE( rms_disruptions[tipo], "TODOS LOS TIPOS" )
+RETURN
+    _tipo & " | " & _tec & " — Cumplimiento TRFn"
+
+-- HTML_KPI_TotalEventos  ·  tabla Medidas
+HTML_KPI_TotalEventos =
+VAR _val     = [Total_Eventos_inc]
+VAR _cumple  = [Cumple_TRFn_inc]
+VAR _pct_val = DIVIDE( _cumple, _val, 0 )
+VAR _pct_txt = IF( ISBLANK(_val), "-", FORMAT( _pct_val, "0.0%" ) )
+VAR _bar_w   = FORMAT( ROUND( _pct_val * 100, 0 ), "0" )
+VAR _c_acc   = "#6B1F7C"
+VAR _c_bg    = "#E8D5F0"
+VAR _c_txt   = "#3A0A4A"
+VAR _punto   = UNICHAR(183)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _c_acc & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:600;color:#5A1A6E;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>Total Eventos</div>"
+& "<div style='font-size:32px;font-weight:800;color:" & _c_acc & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val), "-", FORMAT(_val, "#,0")) & "</div>"
+& "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;'>"
+  & "<span style='font-size:12px;font-weight:500;color:#3D3D3D;'>Cumplimiento TRF</span>"
+  & "<span style='font-size:13px;font-weight:700;color:" & _c_txt & ";'>" & _pct_txt & "</span>"
+& "</div>"
+& "<div style='height:5px;background:#D8B8E8;border-radius:3px;overflow:hidden;margin-bottom:8px;'>"
+  & "<div style='height:100%;width:" & _bar_w & "%;background:" & _c_acc & ";border-radius:3px;'></div>"
+& "</div>"
+& "<div style='background:" & _c_bg & ";border-radius:4px;padding:5px 10px;display:inline-block;'>"
+  & "<span style='font-size:11px;font-weight:700;color:" & _c_txt & ";'>" & FORMAT(COALESCE(_cumple,0),"#,0") & " cumple " & _punto & " " & FORMAT(COALESCE([NoCumple_TRFn_inc],0),"#,0") & " no cumple</span>"
+& "</div>"
+& "</div>"
+
+-- HTML_KPI_CumpleTRFn  ·  tabla Medidas
+HTML_KPI_CumpleTRFn =
+VAR _val     = [Cumple_TRFn_inc]
+VAR _total   = [Total_Eventos_inc]
+VAR _pct_val = DIVIDE( _val, _total, 0 )
+VAR _pct_txt = IF( ISBLANK(_val), "-", FORMAT( _pct_val, "0.0%" ) )
+VAR _es_crit = NOT ISBLANK(_pct_val) && _pct_val < 0.75
+VAR _es_ale  = NOT ISBLANK(_pct_val) && _pct_val >= 0.75 && _pct_val < 0.78
+VAR _c_acc   = IF(_es_crit, "#B71C1C", IF(_es_ale, "#BF360C", "#1B5E20"))
+VAR _c_txt   = IF(_es_crit, "#7F0000", IF(_es_ale, "#7F3000", "#0A3D0A"))
+VAR _bar_w   = FORMAT( ROUND( _pct_val * 100, 0 ), "0" )
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _c_acc & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:600;color:#5A1A6E;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>Cumple TRF</div>"
+& "<div style='font-size:32px;font-weight:800;color:" & _c_acc & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val), "-", FORMAT(_val, "#,0")) & "</div>"
+& "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;'>"
+  & "<span style='font-size:12px;font-weight:500;color:#3D3D3D;'>% TRF</span>"
+  & "<span style='font-size:13px;font-weight:700;color:" & _c_txt & ";'>" & _pct_txt & "</span>"
+& "</div>"
+& "<div style='height:5px;background:#D8B8E8;border-radius:3px;overflow:hidden;'>"
+  & "<div style='height:100%;width:" & _bar_w & "%;background:" & _c_acc & ";border-radius:3px;'></div>"
+& "</div>"
+& "</div>"
+
+-- HTML_KPI_NoCumpleTRFn  ·  tabla Medidas
+HTML_KPI_NoCumpleTRFn =
+VAR _val     = [NoCumple_TRFn_inc]
+VAR _total   = [Total_Eventos_inc]
+VAR _pct_val = DIVIDE( _val, _total, 0 )
+VAR _pct_txt = IF( ISBLANK(_val), "-", FORMAT( _pct_val, "0.0%" ) )
+VAR _es_alto = NOT ISBLANK(_pct_val) && _pct_val > 0.25
+VAR _es_med  = NOT ISBLANK(_pct_val) && _pct_val > 0.22 && _pct_val <= 0.25
+VAR _c_acc   = IF(_es_alto, "#B71C1C", IF(_es_med, "#BF360C", "#33691E"))
+VAR _c_txt   = IF(_es_alto, "#7F0000", IF(_es_med, "#7F3000", "#1B3A09"))
+VAR _bar_w   = FORMAT( ROUND( _pct_val * 100, 0 ), "0" )
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _c_acc & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:600;color:#5A1A6E;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>No Cumple TRF</div>"
+& "<div style='font-size:32px;font-weight:800;color:" & _c_acc & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val), "-", FORMAT(_val, "#,0")) & "</div>"
+& "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;'>"
+  & "<span style='font-size:12px;font-weight:500;color:#3D3D3D;'>% sobre total</span>"
+  & "<span style='font-size:13px;font-weight:700;color:" & _c_txt & ";'>" & _pct_txt & "</span>"
+& "</div>"
+& "<div style='height:5px;background:#D8B8E8;border-radius:3px;overflow:hidden;'>"
+  & "<div style='height:100%;width:" & _bar_w & "%;background:" & _c_acc & ";border-radius:3px;'></div>"
+& "</div>"
+& "</div>"
+
+-- HTML_Tendencia_TRFn  ·  tabla Medidas
+HTML_Tendencia_TRFn =
+VAR _base =
+    CALCULATETABLE(
+        SUMMARIZE( vw_rms_incidents, vw_rms_incidents[Year_inc], vw_rms_incidents[MonthNo_inc], vw_rms_incidents[Month_inc] ),
+        ALL( vw_rms_incidents[Year_inc] ),
+        ALL( vw_rms_incidents[MonthNo_inc] ),
+        ALL( vw_rms_incidents[Month_inc] )
+    )
+VAR _data =
+    FILTER(
+        ADDCOLUMNS(
+            _base,
+            "_key",  vw_rms_incidents[Year_inc] * 100 + vw_rms_incidents[MonthNo_inc],
+            "_fort",
+                VAR _y = vw_rms_incidents[Year_inc]
+                VAR _m = vw_rms_incidents[MonthNo_inc]
+                RETURN CALCULATE( [Pct_TRFn_Fortuito_inc], vw_rms_incidents[Year_inc]=_y, vw_rms_incidents[MonthNo_inc]=_m, ALL(vw_rms_incidents[Month_inc]) ),
+            "_prog",
+                VAR _y = vw_rms_incidents[Year_inc]
+                VAR _m = vw_rms_incidents[MonthNo_inc]
+                RETURN CALCULATE( [Pct_TRFn_Programado_inc], vw_rms_incidents[Year_inc]=_y, vw_rms_incidents[MonthNo_inc]=_m, ALL(vw_rms_incidents[Month_inc]) ),
+            "_tot",
+                VAR _y = vw_rms_incidents[Year_inc]
+                VAR _m = vw_rms_incidents[MonthNo_inc]
+                RETURN CALCULATE( [Total_Eventos_inc], vw_rms_incidents[Year_inc]=_y, vw_rms_incidents[MonthNo_inc]=_m, ALL(vw_rms_incidents[Month_inc]) )
+        ),
+        [_tot] > 0
+    )
+VAR _n    = COUNTROWS(_data)
+VAR _kmin = MINX(_data,[_key])
+VAR _kmin_year = INT(_kmin/100)
+VAR _w=560 VAR _h=155 VAR _pl=34 VAR _pr=16 VAR _pt=10 VAR _pb=26
+VAR _cw=_w-_pl-_pr VAR _ch=_h-_pt-_pb
+VAR _ymin=0.55 VAR _ymax=1.00 VAR _yr=_ymax-_ymin
+VAR _step=IF(_n<=1,_cw,INT(_cw/(_n-1)))
+VAR _grid=
+    "<line x1='" &_pl& "' y1='" &INT(_pt+_ch*0.00)& "' x2='" &(_w-_pr)& "' y2='" &INT(_pt+_ch*0.00)& "' stroke='#EDE0F5' stroke-width='1'/>"
+    & "<line x1='" &_pl& "' y1='" &INT(_pt+_ch*0.25)& "' x2='" &(_w-_pr)& "' y2='" &INT(_pt+_ch*0.25)& "' stroke='#EDE0F5' stroke-width='1'/>"
+    & "<line x1='" &_pl& "' y1='" &INT(_pt+_ch*0.50)& "' x2='" &(_w-_pr)& "' y2='" &INT(_pt+_ch*0.50)& "' stroke='#EDE0F5' stroke-width='1'/>"
+    & "<line x1='" &_pl& "' y1='" &INT(_pt+_ch*0.75)& "' x2='" &(_w-_pr)& "' y2='" &INT(_pt+_ch*0.75)& "' stroke='#EDE0F5' stroke-width='1'/>"
+    & "<text x='" &(_pl-3)& "' y='" &INT(_pt+_ch*0.00+4)& "' text-anchor='end' font-size='9' fill='#C4A8D8'>100%</text>"
+    & "<text x='" &(_pl-3)& "' y='" &INT(_pt+_ch*0.25+4)& "' text-anchor='end' font-size='9' fill='#C4A8D8'>89%</text>"
+    & "<text x='" &(_pl-3)& "' y='" &INT(_pt+_ch*0.50+4)& "' text-anchor='end' font-size='9' fill='#C4A8D8'>78%</text>"
+    & "<text x='" &(_pl-3)& "' y='" &INT(_pt+_ch*0.75+4)& "' text-anchor='end' font-size='9' fill='#C4A8D8'>67%</text>"
+VAR _pf=CONCATENATEX(_data,IF(NOT ISBLANK([_fort]),VAR _i=RANKX(_data,[_key],,ASC,Dense)-1 VAR _x=_pl+_i*_step VAR _y=INT(_pt+_ch*(1-([_fort]-_ymin)/_yr)) RETURN _x&","&_y)," ",[_key],ASC)
+VAR _pp=CONCATENATEX(_data,IF(NOT ISBLANK([_prog]),VAR _i=RANKX(_data,[_key],,ASC,Dense)-1 VAR _x=_pl+_i*_step VAR _y=INT(_pt+_ch*(1-([_prog]-_ymin)/_yr)) RETURN _x&","&_y)," ",[_key],ASC)
+VAR _df=CONCATENATEX(_data,IF(NOT ISBLANK([_fort]),VAR _i=RANKX(_data,[_key],,ASC,Dense)-1 VAR _x=_pl+_i*_step VAR _y=INT(_pt+_ch*(1-([_fort]-_ymin)/_yr)) RETURN "<circle cx='"&_x&"' cy='"&_y&"' r='3' fill='#9B3DB8' stroke='white' stroke-width='1.5'/>"),"",[_key],ASC)
+VAR _dp=CONCATENATEX(_data,IF(NOT ISBLANK([_prog]),VAR _i=RANKX(_data,[_key],,ASC,Dense)-1 VAR _x=_pl+_i*_step VAR _y=INT(_pt+_ch*(1-([_prog]-_ymin)/_yr)) RETURN "<circle cx='"&_x&"' cy='"&_y&"' r='3' fill='#6B1F7C' stroke='white' stroke-width='1.5'/>"),"",[_key],ASC)
+VAR _lb=CONCATENATEX(_data,VAR _i=RANKX(_data,[_key],,ASC,Dense)-1 VAR _x=_pl+_i*_step VAR _ya=INT([_key]/100) VAR _lbl=IF(vw_rms_incidents[Month_inc]="Ene"&&_ya<>_kmin_year,"Ene '"&RIGHT(FORMAT(_ya,"0"),2),vw_rms_incidents[Month_inc]) RETURN "<text x='"&_x&"' y='"&(_h-4)&"' text-anchor='middle' font-size='9' fill='#C4A8D8'>"&_lbl&"</text>","",[_key],ASC)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #DDD0E8;border-radius:6px;padding:14px 16px;'>"
+&"<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;'>"
+&"<span style='font-size:11px;font-weight:600;color:#6B1F7C;text-transform:uppercase;letter-spacing:0.5px;'>Tendencia Mensual % TRFn</span>"
+&"<div style='display:flex;gap:14px;'>"
+&"<span style='font-size:10px;color:#757575;display:flex;align-items:center;gap:5px;'><svg width='16' height='6'><line x1='0' y1='3' x2='16' y2='3' stroke='#9B3DB8' stroke-width='2'/></svg>Fortuito</span>"
+&"<span style='font-size:10px;color:#757575;display:flex;align-items:center;gap:5px;'><svg width='16' height='6'><line x1='0' y1='3' x2='16' y2='3' stroke='#6B1F7C' stroke-width='2' stroke-dasharray='5,2'/></svg>Programado</span>"
+&"</div></div>"
+&"<svg width='100%' viewBox='0 0 "&_w&" "&_h&"' xmlns='http://www.w3.org/2000/svg'>"
+&_grid
+&"<polyline points='"&_pf&"' fill='none' stroke='#9B3DB8' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/>"
+&"<polyline points='"&_pp&"' fill='none' stroke='#6B1F7C' stroke-width='2' stroke-dasharray='6,3' stroke-linejoin='round' stroke-linecap='round'/>"
+&_df&_dp&_lb
+&"</svg></div>"
+
+-- HTML_Semaforo_TRFn  ·  tabla Medidas
+HTML_Semaforo_TRFn =
+VAR _umbral = 0.85
+VAR _filas =
+    FILTER(
+        ADDCOLUMNS(
+            SUMMARIZE(
+                rms_disruptions,
+                rms_disruptions[servicio],
+                rms_disruptions[tec]
+            ),
+            "_tot",  CALCULATE( [Total_Eventos] ),
+            "_pct",  CALCULATE( DIVIDE( [Cumple_TRFn], [Total_Eventos], BLANK() ) ),
+            "_sla",  CALCULATE( MAX( SLA[SLA] ) )
+        ),
+        [_tot] > 0
+            && ( rms_disruptions[servicio] = "Internet" || rms_disruptions[servicio] = "Telefonía" || rms_disruptions[servicio] = "Televisión" )
+            && ( rms_disruptions[tec] = "GPON" || rms_disruptions[tec] = "HFC" )
+    )
+VAR _rows =
+    CONCATENATEX(
+        _filas,
+        VAR _p   = [_pct]
+        VAR _ok  = NOT ISBLANK(_p) && _p >= _umbral
+        VAR _al  = NOT ISBLANK(_p) && _p >= 0.80 && _p < _umbral
+        VAR _ca  = IF( _ok, "#1E8C45", IF( _al, "#E65100", "#C62828" ) )
+        VAR _cb  = IF( _ok, "#E8F5E9", IF( _al, "#FFF3E0", "#FFEBEE" ) )
+        VAR _ct  = IF( _ok, "#145C2E", IF( _al, "#BF360C", "#B71C1C" ) )
+        VAR _est = IF( _ok, "OK",      IF( _al, "ALERTA",  "CRÍTICO" ) )
+        VAR _dr  = IF( NOT _ok && NOT _al, "<div style='width:8px;height:8px;border-radius:50%;background:#C62828;'></div>", "<div style='width:8px;height:8px;border-radius:50%;background:#E8E0EF;'></div>" )
+        VAR _dy  = IF( _al, "<div style='width:8px;height:8px;border-radius:50%;background:#E65100;'></div>", "<div style='width:8px;height:8px;border-radius:50%;background:#E8E0EF;'></div>" )
+        VAR _dg  = IF( _ok, "<div style='width:8px;height:8px;border-radius:50%;background:#1E8C45;'></div>", "<div style='width:8px;height:8px;border-radius:50%;background:#E8E0EF;'></div>" )
+        VAR _pt  = IF( ISBLANK(_p), "—", FORMAT( _p, "0.0%" ) )
+        VAR _sl  = IF( ISBLANK([_sla]), "—", FORMAT([_sla],"0") & " h" )
+        RETURN
+        "<div style='display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#FAFAFA;border:1px solid #EDE0F5;border-left:3px solid " &_ca& ";border-radius:4px;margin-bottom:5px;'>"
+        & "<div style='display:flex;align-items:center;gap:7px;'>"
+          & "<div style='display:flex;flex-direction:column;gap:3px;'>" &_dr& _dy& _dg& "</div>"
+          & "<div><div style='font-size:11px;font-weight:600;color:#212121;'>" &rms_disruptions[servicio]& " · " &rms_disruptions[tec]& "</div>"
+          & "<div style='font-size:9px;color:#9B3DB8;margin-top:1px;'>" &FORMAT([_tot],"#,0")& " eventos · SLA " &_sl& "</div></div>"
+        & "</div>"
+        & "<div style='text-align:right;'><div style='font-size:17px;font-weight:700;color:" &_ca& ";line-height:1;'>" &_pt& "</div>"
+        & "<div style='margin-top:3px;background:" &_cb& ";border-radius:3px;padding:2px 6px;display:inline-block;'><span style='font-size:9px;font-weight:700;color:" &_ct& ";'>" &_est& "</span></div></div>"
+        & "</div>",
+        "", rms_disruptions[servicio], ASC
+    )
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;padding:14px 16px;background:#fff;border:1px solid #DDD0E8;border-radius:6px;'>"
+& "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;'>"
+& "<span style='font-size:11px;font-weight:600;color:#6B1F7C;text-transform:uppercase;letter-spacing:0.5px;'>Semáforo SLA por Servicio</span>"
+& "<span style='font-size:9px;color:#9B3DB8;background:#F0EBF5;border:1px solid #DDD0E8;border-radius:3px;padding:2px 7px;'>Meta ≥ 85%</span>"
+& "</div>" & _rows & "</div>"
+
+-- HTML_Titulo_TRFn  ·  tabla Medidas
+HTML_Titulo_TRFn =
+VAR _tec  = SELECTEDVALUE( vw_rms_incidents[tec],  "TODAS" )
+VAR _tipo = SELECTEDVALUE( vw_rms_incidents[TIPO], "TODOS" )
+VAR _year = SELECTEDVALUE( Calendar[Year],          "" )
+VAR _mes  = SELECTEDVALUE( Calendar[Month short],   "" )
+VAR _dia  = SELECTEDVALUE( Calendar[DayNro],        0 )
+VAR _periodo =
+    IF( _dia > 0,
+        _mes & " " & FORMAT(_dia,"0") & ", " & _year,
+        IF( _mes <> "", _mes & " " & _year, _year )
+    )
+VAR _tot     = [Total_Eventos_inc]
+VAR _pct_val = [Pct_TRFn_inc]
+VAR _pct_txt = IF( ISBLANK(_pct_val), "-", FORMAT( _pct_val, "0.0%" ) )
+VAR _es_ok   = NOT ISBLANK(_pct_val) && _pct_val >= 0.78
+VAR _es_al   = NOT ISBLANK(_pct_val) && _pct_val >= 0.75 && _pct_val < 0.78
+VAR _c_pct   = IF( _es_ok, "#1B5E20", IF( _es_al, "#BF360C", "#B71C1C" ) )
+VAR _c_dot   = IF( _es_ok, "#1B5E20", IF( _es_al, "#BF360C", "#B71C1C" ) )
+VAR _fort_txt = FORMAT( COALESCE([Pct_TRFn_Fortuito_inc],  0), "0.0%" )
+VAR _prog_txt = FORMAT( COALESCE([Pct_TRFn_Programado_inc],0), "0.0%" )
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid #6B1F7C;border-radius:4px;padding:16px 18px;height:100%;display:flex;flex-direction:column;justify-content:space-between;'>"
+& "<div>"
+  & "<div style='font-size:11px;font-weight:700;color:#5A1A6E;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;'>Cumplimiento TRF</div>"
+  & "<div style='font-size:17px;font-weight:800;color:#3A0A4A;line-height:1.3;'>" & _tipo & " &#183; " & _tec & "</div>"
+  & "<div style='font-size:13px;font-weight:600;color:#4A1557;margin-top:3px;'>" & _periodo & "</div>"
+& "</div>"
+& "<div style='margin-top:10px;padding-top:10px;border-top:2px solid #D8B8E8;'>"
+  & "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'>"
+    & "<div style='display:flex;align-items:center;gap:7px;'>"
+      & "<div style='width:10px;height:10px;border-radius:50%;background:" & _c_dot & ";'></div>"
+      & "<span style='font-size:12px;font-weight:600;color:#2D2D2D;'>" & FORMAT(COALESCE(_tot,0),"#,0") & " eventos</span>"
+    & "</div>"
+    & "<span style='font-size:20px;font-weight:800;color:" & _c_pct & ";'>" & _pct_txt & "</span>"
+  & "</div>"
+  & "<div style='display:flex;gap:8px;'>"
+    & "<div style='flex:1;background:#E8D5F0;border-radius:4px;padding:5px 8px;text-align:center;'>"
+      & "<div style='font-size:10px;font-weight:700;color:#4A1557;'>Fortuito</div>"
+      & "<div style='font-size:14px;font-weight:800;color:#3A0A4A;'>" & _fort_txt & "</div>"
+    & "</div>"
+    & "<div style='flex:1;background:#E8D5F0;border-radius:4px;padding:5px 8px;text-align:center;'>"
+      & "<div style='font-size:10px;font-weight:700;color:#4A1557;'>Programado</div>"
+      & "<div style='font-size:14px;font-weight:800;color:#3A0A4A;'>" & _prog_txt & "</div>"
+    & "</div>"
+  & "</div>"
+& "</div>"
+& "</div>"
+
+-- total_registros  ·  tabla Medidas
+total_registros =
+COUNTROWS(rms_disruptions)
+
+-- Total_Eventos_inc  ·  tabla Medidas
+Total_Eventos_inc =
+DISTINCTCOUNT( vw_rms_incidents[ID] )
+
+-- Cumple_TRFn_inc  ·  tabla Medidas
+Cumple_TRFn_inc =
+COUNTROWS(
+    FILTER(
+        vw_rms_incidents,
+        vw_rms_incidents[Cumple_SLA_inc] = "Cumple"
+    )
+)
+
+-- NoCumple_TRFn_inc  ·  tabla Medidas
+NoCumple_TRFn_inc =
+COUNTROWS(
+    FILTER(
+        vw_rms_incidents,
+        vw_rms_incidents[Cumple_SLA_inc] = "No Cumple"
+    )
+)
+
+-- Pct_TRFn_inc  ·  tabla Medidas
+Pct_TRFn_inc =
+DIVIDE( [Cumple_TRFn_inc], [Total_Eventos_inc], BLANK() )
+
+-- Pct_TRFn_Fortuito_inc  ·  tabla Medidas
+Pct_TRFn_Fortuito_inc =
+VAR _TipoSeleccionado = SELECTEDVALUE(vw_rms_incidents[TIPO])
+RETURN
+IF(
+    _TipoSeleccionado IN { "Programado", "Emergente" },
+    BLANK(),
+    DIVIDE(
+        CALCULATE( DISTINCTCOUNT(vw_rms_incidents[ID]), vw_rms_incidents[TIPO] = "Fortuito" ),
+        CALCULATE( [Total_Eventos_inc], ALL(vw_rms_incidents[TIPO]) )
+    )
+)
+
+-- Pct_TRFn_Programado_inc  ·  tabla Medidas
+Pct_TRFn_Programado_inc =
+VAR _TipoSeleccionado = SELECTEDVALUE(vw_rms_incidents[TIPO])
+RETURN
+IF(
+    _TipoSeleccionado = "Fortuito",
+    BLANK(),
+    DIVIDE(
+        CALCULATE( DISTINCTCOUNT(vw_rms_incidents[ID]), vw_rms_incidents[TIPO] IN { "Programado", "Emergente" } ),
+        CALCULATE( [Total_Eventos_inc], ALL(vw_rms_incidents[TIPO]) )
+    )
+)
+
+-- TRF_Promedio_inc  ·  tabla Medidas
+TRF_Promedio_inc =
+AVERAGEX( vw_rms_incidents, vw_rms_incidents[trf_neto_horas] )
+
+-- TRF_Max_inc  ·  tabla Medidas
+TRF_Max_inc =
+MAXX( vw_rms_incidents, vw_rms_incidents[trf_neto_horas] )
+
+-- HTML_Tabla_TRFn_inc  ·  tabla Medidas
+HTML_Tabla_TRFn_inc =
+VAR _tipo   = SELECTEDVALUE( vw_rms_incidents[TIPO], "TODOS" )
+VAR _titulo = UPPER( _tipo & " " & UNICHAR(8212) & " CUMPLIMIENTO TRFn" )
+VAR _header  = "#6B1F7C"
+VAR _header2 = "#9B3DB8"
+VAR _borde   = "#DDD0E8"
+VAR _rojo    = "#C62828"
+VAR _negro   = "#212121"
+VAR _umbral  = 0.80
+
+VAR _filas =
+    CONCATENATEX(
+        FILTER(
+            ADDCOLUMNS(
+                ALLSELECTED( vw_rms_incidents[ciudad] ),
+                "_tot",  CALCULATE( [Total_Eventos_inc] ),
+                "_cum",  CALCULATE( [Cumple_TRFn_inc] ),
+                "_noc",  CALCULATE( [NoCumple_TRFn_inc] ),
+                "_pct",  CALCULATE( DIVIDE( [Cumple_TRFn_inc], [Total_Eventos_inc], BLANK() ) ),
+                "_fort", CALCULATE( [Pct_TRFn_Fortuito_inc] ),
+                "_prog", CALCULATE( [Pct_TRFn_Programado_inc] )
+            ),
+            NOT ISBLANK( [_tot] ) && [_tot] > 0
+        ),
+        VAR _p   = [_pct]
+        VAR _pt  = IF( ISBLANK(_p), "", FORMAT(_p, "0.00%") )
+        VAR _ft  = IF( ISBLANK([_fort]), "", FORMAT([_fort], "0.00%") )
+        VAR _pr  = IF( ISBLANK([_prog]), "", FORMAT([_prog], "0.00%") )
+        VAR _cp  = IF( NOT ISBLANK(_p) && _p < _umbral, _rojo, _negro )
+        VAR _fw  = IF( NOT ISBLANK(_p) && _p < _umbral, "bold", "normal" )
+        VAR _s0  = "padding:5px 8px;border:1px solid " & _borde & ";"
+        VAR _td  = "style='" & _s0 & "'"
+        VAR _tdr = "style='" & _s0 & "text-align:right;'"
+        VAR _tdp = "style='" & _s0 & "text-align:right;color:" & _cp & ";font-weight:" & _fw & ";'"
+        RETURN
+        "<tr>"
+        & "<td " & _td  & ">" & [ciudad] & "</td>"
+        & "<td " & _tdr & ">" & FORMAT( COALESCE([_tot],0), "0" ) & "</td>"
+        & "<td " & _tdr & ">" & FORMAT( COALESCE([_cum],0), "0" ) & "</td>"
+        & "<td " & _tdr & ">" & FORMAT( COALESCE([_noc],0), "0" ) & "</td>"
+        & "<td " & _tdp & ">" & _pt & "</td>"
+        & "<td " & _tdr & ">" & _ft & "</td>"
+        & "<td " & _tdr & ">" & _pr & "</td>"
+        & "</tr>",
+        "", [_pct], DESC
+    )
+
+VAR _tot_g = [Total_Eventos_inc]
+VAR _cum_g = [Cumple_TRFn_inc]
+VAR _noc_g = [NoCumple_TRFn_inc]
+VAR _pct_g = DIVIDE( _cum_g, _tot_g, BLANK() )
+VAR _pt_g  = IF( ISBLANK(_pct_g), "", FORMAT(_pct_g, "0.00%") )
+VAR _cp_g  = IF( NOT ISBLANK(_pct_g) && _pct_g < _umbral, _rojo, _negro )
+VAR _ft_g  = IF( ISBLANK([Pct_TRFn_Fortuito_inc]),  "", FORMAT([Pct_TRFn_Fortuito_inc],  "0.00%") )
+VAR _pr_g  = IF( ISBLANK([Pct_TRFn_Programado_inc]), "", FORMAT([Pct_TRFn_Programado_inc], "0.00%") )
+
+VAR _th  = "style='padding:6px 8px;border:1px solid " & _borde & ";color:white;text-align:center;font-size:12px;background:" & _header  & ";'"
+VAR _th2 = "style='padding:6px 8px;border:1px solid " & _borde & ";color:white;text-align:center;font-size:12px;background:" & _header2 & ";'"
+VAR _tdf = "padding:6px 8px;border:1px solid " & _borde & ";font-weight:bold;"
+
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;font-size:12px;'>"
+& "<div style='background:" & _header & ";color:white;padding:8px 10px;font-weight:bold;font-size:13px;text-align:center;margin-bottom:4px;letter-spacing:0.5px;'>" & _titulo & "</div>"
+& "<table style='border-collapse:collapse;width:100%;'>"
+& "<thead><tr>"
+& "<th " & _th  & ">Ciudad</th>"
+& "<th " & _th  & ">Total</th>"
+& "<th " & _th  & ">Cumple TRFn</th>"
+& "<th " & _th  & ">No Cumple TRFn</th>"
+& "<th " & _th  & ">% TRFn</th>"
+& "<th " & _th2 & ">% Fortuito</th>"
+& "<th " & _th2 & ">% Programado</th>"
+& "</tr></thead>"
+& "<tbody>" & _filas & "</tbody>"
+& "<tfoot><tr style='background:#F0EBF5;'>"
+& "<td style='" & _tdf & "color:#6B1F7C;'>TOTAL</td>"
+& "<td style='" & _tdf & "text-align:right;'>" & IF(ISBLANK(_tot_g),"0",FORMAT(_tot_g,"0")) & "</td>"
+& "<td style='" & _tdf & "text-align:right;'>" & IF(ISBLANK(_cum_g),"0",FORMAT(_cum_g,"0")) & "</td>"
+& "<td style='" & _tdf & "text-align:right;'>" & IF(ISBLANK(_noc_g),"0",FORMAT(_noc_g,"0")) & "</td>"
+& "<td style='" & _tdf & "text-align:right;color:" & _cp_g & ";font-weight:bold;'>" & _pt_g & "</td>"
+& "<td style='" & _tdf & "text-align:right;'>" & _ft_g & "</td>"
+& "<td style='" & _tdf & "text-align:right;'>" & _pr_g & "</td>"
+& "</tr></tfoot>"
+& "</table></div>"
+
+-- Pct_Serv_Internet_inc  ·  tabla Medidas
+Pct_Serv_Internet_inc =
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+VAR _ciudades = VALUES( rms_disruptions[ciudad] )
+
+VAR _afect_gpon =
+    IF( _tec = "HFC", 0,
+        CALCULATE(
+            SUM( rms_disruptions[SRVAfecXTiempoAfectado] ),
+            rms_disruptions[servicio] = "Internet",
+            rms_disruptions[tec] = "GPON"
+        )
+    )
+VAR _afect_hfc =
+    IF( _tec = "GPON", 0,
+        CALCULATE(
+            SUM( rms_disruptions[SRVAfecXTiempoAfectado] ),
+            rms_disruptions[servicio] = "Internet",
+            rms_disruptions[tec] = "HFC"
+        )
+    )
+VAR _numerador = _afect_gpon + _afect_hfc
+
+VAR _base_gpon =
+    IF( _tec = "HFC", 0,
+        CALCULATE(
+            SUM( Servicios_gpon[Internet] ),
+            TREATAS( _ciudades, Servicios_gpon[Ciudad] )
+        )
+    )
+VAR _base_hfc =
+    IF( _tec = "GPON", 0,
+        CALCULATE(
+            SUM( Servicios_hfc[Internet] ),
+            TREATAS( _ciudades, Servicios_hfc[Ciudad] )
+        )
+    )
+VAR _denominador = COALESCE( _base_gpon, 0 ) + COALESCE( _base_hfc, 0 )
+
+RETURN DIVIDE( _numerador, _denominador, BLANK() )
+
+-- Pct_Serv_Telefonia_inc  ·  tabla Medidas
+Pct_Serv_Telefonia_inc =
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+VAR _ciudades = VALUES( rms_disruptions[ciudad] )
+
+VAR _afect_gpon =
+    IF( _tec = "HFC", 0,
+        CALCULATE(
+            SUM( rms_disruptions[SRVAfecXTiempoAfectado] ),
+            rms_disruptions[servicio] = "Telefonía",
+            rms_disruptions[tec] = "GPON"
+        )
+    )
+VAR _afect_hfc =
+    IF( _tec = "GPON", 0,
+        CALCULATE(
+            SUM( rms_disruptions[SRVAfecXTiempoAfectado] ),
+            rms_disruptions[servicio] = "Telefonía",
+            rms_disruptions[tec] = "HFC"
+        )
+    )
+VAR _numerador = _afect_gpon + _afect_hfc
+
+VAR _base_gpon =
+    IF( _tec = "HFC", 0,
+        CALCULATE(
+            SUM( Servicios_gpon[Telefonía] ),
+            TREATAS( _ciudades, Servicios_gpon[Ciudad] )
+        )
+    )
+VAR _base_hfc =
+    IF( _tec = "GPON", 0,
+        CALCULATE(
+            SUM( Servicios_hfc[Telefonía] ),
+            TREATAS( _ciudades, Servicios_hfc[Ciudad] )
+        )
+    )
+VAR _denominador = COALESCE( _base_gpon, 0 ) + COALESCE( _base_hfc, 0 )
+
+RETURN DIVIDE( _numerador, _denominador, BLANK() )
+
+-- Pct_Serv_Television_inc  ·  tabla Medidas
+Pct_Serv_Television_inc =
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+VAR _ciudades = VALUES( rms_disruptions[ciudad] )
+
+VAR _afect_gpon =
+    IF( _tec = "HFC", 0,
+        CALCULATE(
+            SUM( rms_disruptions[SRVAfecXTiempoAfectado] ),
+            rms_disruptions[servicio] = "Televisión",
+            rms_disruptions[tec] = "GPON"
+        )
+    )
+VAR _afect_hfc =
+    IF( _tec = "GPON", 0,
+        CALCULATE(
+            SUM( rms_disruptions[SRVAfecXTiempoAfectado] ),
+            rms_disruptions[servicio] = "Televisión",
+            rms_disruptions[tec] = "HFC"
+        )
+    )
+VAR _numerador = _afect_gpon + _afect_hfc
+
+VAR _base_gpon =
+    IF( _tec = "HFC", 0,
+        CALCULATE(
+            SUM( Servicios_gpon[Televisión] ),
+            TREATAS( _ciudades, Servicios_gpon[Ciudad] )
+        )
+    )
+VAR _base_hfc =
+    IF( _tec = "GPON", 0,
+        CALCULATE(
+            SUM( Servicios_hfc[Televisión] ),
+            TREATAS( _ciudades, Servicios_hfc[Ciudad] )
+        )
+    )
+VAR _denominador = COALESCE( _base_gpon, 0 ) + COALESCE( _base_hfc, 0 )
+
+RETURN DIVIDE( _numerador, _denominador, BLANK() )
+
+-- Cant_Eventos_inc  ·  tabla Medidas
+Cant_Eventos_inc =
+CALCULATE(
+    DISTINCTCOUNT( rms_disruptions[id] ),
+    rms_disruptions[servicio] = "Internet",
+    rms_disruptions[afectacion] > 0
+)
+
+-- MTBF_inc  ·  tabla Medidas
+MTBF_inc =
+VAR _dias_periodo = 28
+VAR _data =
+    CALCULATETABLE(
+        rms_disruptions,
+        rms_disruptions[servicio] = "Internet"
+    )
+VAR _mtbf_por_nodo =
+    SUMMARIZE(
+        _data,
+        rms_disruptions[red],
+        rms_disruptions[ciudad],
+        "_eventos", DISTINCTCOUNT( rms_disruptions[id] )
+    )
+RETURN
+    AVERAGEX(
+        FILTER( _mtbf_por_nodo, [_eventos] > 0 ),
+        DIVIDE( _dias_periodo, [_eventos] )
+    )
+
+-- Flag_Incumple_MTBF_inc  ·  tabla Medidas
+Flag_Incumple_MTBF_inc =
+VAR _m = [MTBF_inc]
+RETURN IF( NOT ISBLANK(_m) && _m < 7, 1, 0 )
+
+-- Afectacion_Ponderada_inc  ·  tabla Medidas
+Afectacion_Ponderada_inc =
+BLANK()
+
+-- Uptime_inc  ·  tabla Medidas
+Uptime_inc =
+VAR _hp = 28 * 24
+VAR _base =
+    SUMMARIZE(
+        CALCULATETABLE( rms_disruptions, rms_disruptions[servicio] = "Internet" ),
+        rms_disruptions[red],
+        rms_disruptions[ciudad],
+        "_afec",
+        CALCULATE(
+            SUMX( rms_disruptions, rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 ),
+            rms_disruptions[servicio] = "Internet"
+        ) * 24
+    )
+RETURN
+    AVERAGEX( _base, DIVIDE( _hp - [_afec], _hp ) )
+
+-- Flag_Incumple_Uptime_inc  ·  tabla Medidas
+Flag_Incumple_Uptime_inc =
+VAR _u   = [Uptime_inc]
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "HFC" )
+VAR _umb = IF( _tec = "GPON", 0.998, 0.995 )
+RETURN IF( NOT ISBLANK(_u) && _u < _umb, 1, 0 )
+
+-- Nodos_Incumplen_inc  ·  tabla Medidas
+Nodos_Incumplen_inc =
+COUNTROWS(
+    FILTER(
+        CALCULATETABLE( VALUES(vw_rms_incidents[red]), ALL(Calendar) ),
+        VAR _r      = vw_rms_incidents[red]
+        VAR _tec    = CALCULATE( FIRSTNONBLANK(vw_rms_incidents[tec],1), ALL(Calendar) )
+        VAR _umbral = IF( _tec = "GPON", 0.998, 0.995 )
+        VAR _ev     = CALCULATE( DISTINCTCOUNT(vw_rms_incidents[ID]), vw_rms_incidents[red]=_r, rms_disruptions[servicio]="Internet", ALL(Calendar) )
+        VAR _af     = CALCULATE( SUMX(rms_disruptions, rms_disruptions[afectacion_real]*rms_disruptions[porcentaje]/100)*24, vw_rms_incidents[red]=_r, rms_disruptions[servicio]="Internet", ALL(Calendar) )
+        VAR _mtbf   = DIVIDE(28, _ev)
+        VAR _upt    = DIVIDE(28*24 - _af, 28*24)
+        RETURN NOT ISBLANK(_mtbf) && NOT ISBLANK(_upt) && _mtbf < 7 && _upt < _umbral
+    )
+)
+
+-- HTML_Tabla_MTBF  ·  tabla Medidas
+HTML_Tabla_MTBF =
+VAR _tec_sel = SELECTEDVALUE( vw_rms_incidents[tec], "TODAS" )
+VAR _titulo  = UPPER( "MTBF " & UNICHAR(183) & " UPTIME POR RED " & UNICHAR(8212) & " " & _tec_sel )
+VAR _header  = "#6B1F7C"
+VAR _header2 = "#9B3DB8"
+VAR _borde   = "#DDD0E8"
+VAR _rojo    = "#C62828"
+VAR _ambar   = "#E65100"
+VAR _verde   = "#1E8C45"
+VAR _negro   = "#212121"
+
+VAR _all_d = CALCULATETABLE( VALUES(rms_disruptions[date]), ALL(rms_disruptions) )
+VAR _d1 = MAXX(_all_d, rms_disruptions[date])
+VAR _d2 = MAXX(FILTER(_all_d,rms_disruptions[date]<_d1),rms_disruptions[date])
+VAR _d3 = MAXX(FILTER(_all_d,rms_disruptions[date]<_d2),rms_disruptions[date])
+VAR _d4 = MAXX(FILTER(_all_d,rms_disruptions[date]<_d3),rms_disruptions[date])
+VAR _d5 = MAXX(FILTER(_all_d,rms_disruptions[date]<_d4),rms_disruptions[date])
+VAR _d6 = MAXX(FILTER(_all_d,rms_disruptions[date]<_d5),rms_disruptions[date])
+
+VAR _base =
+    FILTER(
+        ADDCOLUMNS(
+            ALLSELECTED( vw_rms_incidents[red] ),
+            "_tec",   CALCULATE(FIRSTNONBLANK(vw_rms_incidents[tec],1)),
+            "_ciu",   CALCULATE(FIRSTNONBLANK(vw_rms_incidents[ciudad],1)),
+            "_tot",   CALCULATE([Total_Eventos_inc]),
+            "_fort",  CALCULATE([Cant_Fortuitos_inc]),
+            "_prog",  CALCULATE([Cant_Programados_inc]),
+            "_afect", CALCULATE([Afectacion_Real_Horas]),
+            "_mtbf",  CALCULATE([MTBF_inc]),
+            "_upt",   CALCULATE([Uptime_inc]),
+            "_gp",    CALCULATE([GP_inc])
+        ),
+        NOT ISBLANK([_tot]) && [_tot] > 0 && NOT ISBLANK([_tec])
+    )
+
+VAR _data =
+    ADDCOLUMNS(
+        _base,
+        "_umb", IF([_tec]="GPON",0.998,0.995),
+        "_sem",
+            VAR _r   = [red]
+            VAR _umb = IF([_tec]="GPON",0.998,0.995)
+            RETURN CALCULATE( MAX( Nodos_SemConsecutivas[SemConsecutivas] ), Nodos_SemConsecutivas[red]=_r )
+    )
+
+VAR _filas =
+    CONCATENATEX(
+        _data,
+        VAR _ah   = COALESCE([_afect],0)
+        VAR _hh   = INT(_ah)
+        VAR _mm   = INT((_ah-_hh)*60)
+        VAR _ss   = INT(((_ah-_hh)*60-_mm)*60)
+        VAR _afmt = FORMAT(_hh,"0")&":"&FORMAT(_mm,"00")&":"&FORMAT(_ss,"00")
+        VAR _c_mtbf = IF(ISBLANK([_mtbf]),_negro,IF([_mtbf]<7,_rojo,_verde))
+        VAR _c_upt  = IF(ISBLANK([_upt]),_negro,IF([_upt]<[_umb],IF([_upt]<([_umb]-0.01),_rojo,_ambar),_verde))
+        VAR _c_sem  = IF([_sem]>=3,_rojo,IF([_sem]>=1,_ambar,_negro))
+        VAR _bg_row = IF([_gp]=1&&[_sem]>=3,"#FFF5F5","#FAFAFA")
+        VAR _bl_row = IF([_gp]=1&&[_sem]>=3,"3px solid "&_rojo,"1px solid "&_borde)
+        VAR _icon   = IF([_gp]=1&&[_sem]>=3,UNICHAR(9888)&" ","")
+        VAR _s0="padding:5px 8px;border:1px solid "&_borde&";"
+        VAR _td="style='"&_s0&"'"
+        VAR _tdr="style='"&_s0&"text-align:right;'"
+        VAR _tdc="style='"&_s0&"text-align:center;'"
+        VAR _tdm="style='"&_s0&"text-align:right;font-weight:600;color:"&_c_mtbf&";'"
+        VAR _tdu="style='"&_s0&"text-align:right;font-weight:600;color:"&_c_upt&";'"
+        VAR _tds="style='"&_s0&"text-align:center;font-weight:700;color:"&_c_sem&";'"
+        RETURN
+        "<tr style='background:"&_bg_row&";border-left:"&_bl_row&";'>"
+        &"<td "&_td &">"&COALESCE([_ciu],"")&"</td>"
+        &"<td "&_td &">"&_icon&[red]&"</td>"
+        &"<td "&_tdr&">"&FORMAT(COALESCE([_tot],0),"0")&"</td>"
+        &"<td "&_tdr&">"&IF(ISBLANK([_fort]),"0",FORMAT([_fort],"0"))&"</td>"
+        &"<td "&_tdr&">"&IF(ISBLANK([_prog]),"0",FORMAT([_prog],"0"))&"</td>"
+        &"<td "&_tdr&">"&_afmt&"</td>"
+        &"<td "&_tdm&">"&IF(ISBLANK([_mtbf]),"-",FORMAT([_mtbf],"0.0"))&"</td>"
+        &"<td "&_tdu&">"&IF(ISBLANK([_upt]),"-",FORMAT([_upt],"0.00%"))&"</td>"
+        &"<td "&_tdc&">"&IF([_gp]=1,"1","0")&"</td>"
+        &"<td "&_tds&">"&IF([_sem]=0,"",FORMAT([_sem],"0"))&"</td>"
+        &"</tr>",
+        "", [_sem], DESC
+    )
+
+VAR _th ="style='padding:6px 8px;border:1px solid #DDD0E8;color:white;text-align:center;font-size:11px;background:"&_header&";'"
+VAR _th2="style='padding:6px 8px;border:1px solid #DDD0E8;color:white;text-align:center;font-size:11px;background:"&_header2&";'"
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;font-size:12px;'>"
+&"<div style='background:"&_header&";color:white;padding:8px 10px;font-weight:bold;font-size:13px;text-align:center;margin-bottom:4px;letter-spacing:0.5px;'>"&_titulo&"</div>"
+&"<table style='border-collapse:collapse;width:100%;'>"
+&"<thead><tr>"
+  &"<th "&_th &" rowspan='2'>Ciudad</th>"
+  &"<th "&_th &" rowspan='2'>Nodo</th>"
+  &"<th "&_th2&" colspan='3'>N Eventos</th>"
+  &"<th "&_th2&" rowspan='2'>Afectacion</th>"
+  &"<th "&_th2&" rowspan='2'>MTBF</th>"
+  &"<th "&_th2&" rowspan='2'>Uptime</th>"
+  &"<th "&_th2&" rowspan='2'>GP</th>"
+  &"<th "&_th2&" rowspan='2'>Sem.Consec.</th>"
+&"</tr><tr>"
+  &"<th "&_th2&">Total</th>"
+  &"<th "&_th2&">Fortuito</th>"
+  &"<th "&_th2&">Programado</th>"
+&"</tr></thead>"
+&"<tbody>"&_filas&"</tbody>"
+&"</table>"
+&"<div style='margin-top:6px;display:flex;gap:14px;font-size:10px;color:#757575;'>"
+  &"<span><span style='color:"&_rojo&";font-weight:700;'>&#x25A0;</span> GP=1 y >=3 sem.</span>"
+  &"<span><span style='color:"&_ambar&";font-weight:700;'>&#x25A0;</span> GP=1 <3 sem.</span>"
+  &"<span><span style='color:"&_verde&";font-weight:700;'>&#x25A0;</span> Cumple</span>"
+  &"<span style='margin-left:auto;'>MTBF <7d " & UNICHAR(183) & " HFC>=99.5% " & UNICHAR(183) & " GPON>=99.8%</span>"
+&"</div></div>"
+
+-- SemConsecutivas_inc  ·  tabla Medidas
+SemConsecutivas_inc =
+VAR _ciudad = SELECTEDVALUE( rms_disruptions[ciudad] )
+VAR _red    = SELECTEDVALUE( rms_disruptions[red] )
+VAR _tec    = SELECTEDVALUE( rms_disruptions[tec] )
+RETURN
+    CALCULATE(
+        MAX( Nodos_SemConsecutivas[SemConsecutivas] ),
+        Nodos_SemConsecutivas[ciudad] = _ciudad,
+        Nodos_SemConsecutivas[red]    = _red,
+        Nodos_SemConsecutivas[tec]    = _tec
+    )
+
+-- Cant_Fortuitos_inc  ·  tabla Medidas
+Cant_Fortuitos_inc =
+CALCULATE(
+    DISTINCTCOUNT( rms_disruptions[id] ),
+    rms_disruptions[servicio] = "Internet",
+    rms_disruptions[afectacion] > 0,
+    rms_disruptions[tipo_agrupado] = "Fortuito"
+)
+
+-- Cant_Programados_inc  ·  tabla Medidas
+Cant_Programados_inc =
+CALCULATE(
+    DISTINCTCOUNT( rms_disruptions[id] ),
+    rms_disruptions[servicio] = "Internet",
+    rms_disruptions[afectacion] > 0,
+    rms_disruptions[tipo_agrupado] = "Programado"
+)
+
+-- Afectacion_fmt  ·  tabla Medidas
+Afectacion_fmt =
+VAR _afec_horas =
+    SUMX(
+        SUMMARIZE(
+            CALCULATETABLE( rms_disruptions, rms_disruptions[servicio] = "Internet" ),
+            rms_disruptions[id],
+            "_afec",
+            CALCULATE(
+                SUMX( rms_disruptions, rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 ),
+                rms_disruptions[servicio] = "Internet"
+            )
+        ),
+        [_afec]
+    ) * 24
+VAR _horas    = INT( _afec_horas )
+VAR _minutos  = INT( ( _afec_horas - _horas ) * 60 )
+VAR _segundos = INT( ( ( _afec_horas - _horas ) * 60 - _minutos ) * 60 )
+RETURN
+    IF(
+        ISBLANK( _afec_horas ), BLANK(),
+        FORMAT( _horas, "0" ) & ":" &
+        FORMAT( _minutos, "00" ) & ":" &
+        FORMAT( _segundos, "00" )
+    )
+
+-- GP_inc  ·  tabla Medidas
+GP_inc =
+VAR _horas_periodo = 28 * 24
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+VAR _umbral_uptime = IF( _tec = "GPON", 0.998, 0.995 )
+VAR _ev = CALCULATE( DISTINCTCOUNT( rms_disruptions[id] ), rms_disruptions[servicio] = "Internet" )
+VAR _afec_horas =
+    SUMX(
+        SUMMARIZE(
+            CALCULATETABLE( rms_disruptions, rms_disruptions[servicio] = "Internet" ),
+            rms_disruptions[id],
+            "_afec",
+            CALCULATE(
+                SUMX( rms_disruptions, rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 ),
+                rms_disruptions[servicio] = "Internet"
+            )
+        ),
+        [_afec]
+    ) * 24
+VAR _mtbf   = DIVIDE( 28, _ev )
+VAR _uptime = DIVIDE( _horas_periodo - _afec_horas, _horas_periodo )
+RETURN IF( _mtbf < 7 && _uptime < _umbral_uptime, 1, BLANK() )
+
+-- Nodos_Criticos_3sem  ·  tabla Medidas
+Nodos_Criticos_3sem =
+BLANK()
+
+-- HTML_Nodos_Criticos  ·  tabla Medidas
+HTML_Nodos_Criticos =
+BLANK()
+
+-- Nodos_Incumplen_MTBF_inc  ·  tabla Medidas
+Nodos_Incumplen_MTBF_inc =
+VAR _base =
+    FILTER(
+        CALCULATETABLE(
+            SUMMARIZE( rms_disruptions, rms_disruptions[red], rms_disruptions[ciudad],
+                "_ev", CALCULATE( DISTINCTCOUNT( rms_disruptions[id] ), rms_disruptions[servicio] = "Internet" )
+            ),
+            rms_disruptions[servicio] = "Internet"
+        ),
+        NOT ISBLANK( [_ev] ) && [_ev] > 0
+    )
+RETURN COUNTROWS( FILTER( _base, DIVIDE( 28, [_ev] ) < 7 ) )
+
+-- Pct_Cumple_MTBF_inc  ·  tabla Medidas
+Pct_Cumple_MTBF_inc =
+VAR _base =
+    FILTER(
+        CALCULATETABLE(
+            SUMMARIZE( rms_disruptions, rms_disruptions[red], rms_disruptions[ciudad],
+                "_ev", CALCULATE( DISTINCTCOUNT( rms_disruptions[id] ), rms_disruptions[servicio] = "Internet" )
+            ),
+            rms_disruptions[servicio] = "Internet"
+        ),
+        NOT ISBLANK( [_ev] ) && [_ev] > 0
+    )
+VAR _total   = COUNTROWS( _base )
+VAR _cumplen = COUNTROWS( FILTER( _base, DIVIDE( 28, [_ev] ) >= 7 ) )
+RETURN DIVIDE( _cumplen, _total, BLANK() )
+
+-- Nodos_Incumplen_Uptime_inc  ·  tabla Medidas
+Nodos_Incumplen_Uptime_inc =
+VAR _hp = 28 * 24
+VAR _tec    = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+VAR _umbral = IF( _tec = "GPON", 0.998, 0.995 )
+VAR _base =
+    FILTER(
+        CALCULATETABLE(
+            SUMMARIZE( rms_disruptions, rms_disruptions[red], rms_disruptions[ciudad],
+                "_ev",   CALCULATE( DISTINCTCOUNT( rms_disruptions[id] ), rms_disruptions[servicio] = "Internet" ),
+                "_afec", CALCULATE( SUMX( rms_disruptions, rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 ), rms_disruptions[servicio] = "Internet" ) * 24
+            ),
+            rms_disruptions[servicio] = "Internet"
+        ),
+        NOT ISBLANK( [_ev] ) && [_ev] > 0
+    )
+RETURN COUNTROWS( FILTER( _base, DIVIDE( _hp - [_afec], _hp ) < _umbral ) )
+
+-- Nodos_Criticos_inc  ·  tabla Medidas
+Nodos_Criticos_inc =
+VAR _horas_periodo = 28 * 24
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+VAR _umbral_uptime = IF( _tec = "GPON", 0.998, 0.995 )
+VAR _mtbf_por_nodo =
+    SUMMARIZE(
+        CALCULATETABLE( rms_disruptions, rms_disruptions[servicio] = "Internet" ),
+        rms_disruptions[red], rms_disruptions[ciudad],
+        "_ev", DISTINCTCOUNT( rms_disruptions[id] )
+    )
+VAR _uptime_por_nodo =
+    ADDCOLUMNS(
+        SUMMARIZE(
+            CALCULATETABLE( rms_disruptions, rms_disruptions[servicio] = "Internet" ),
+            rms_disruptions[red], rms_disruptions[ciudad]
+        ),
+        "_uptime",
+        CALCULATE(
+            DIVIDE(
+                _horas_periodo -
+                SUMX(
+                    SUMMARIZE(
+                        FILTER( rms_disruptions, rms_disruptions[servicio] = "Internet" ),
+                        rms_disruptions[id],
+                        "_afec", SUMX( FILTER( rms_disruptions, rms_disruptions[servicio] = "Internet" ), rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 )
+                    ),
+                    [_afec]
+                ) * 24,
+                _horas_periodo
+            )
+        )
+    )
+VAR _incumple_mtbf   = SELECTCOLUMNS( FILTER( _mtbf_por_nodo, DIVIDE(28,[_ev]) < 7 ), "r",[red],"c",[ciudad] )
+VAR _incumple_uptime = SELECTCOLUMNS( FILTER( _uptime_por_nodo, [_uptime] < _umbral_uptime ), "r",[red],"c",[ciudad] )
+RETURN COUNTROWS( INTERSECT( _incumple_mtbf, _incumple_uptime ) )
+
+-- Pct_Cumple_Uptime_inc  ·  tabla Medidas
+Pct_Cumple_Uptime_inc =
+VAR _hp     = 28 * 24
+VAR _tec    = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+VAR _umbral = IF( _tec = "GPON", 0.998, 0.995 )
+VAR _base =
+    FILTER(
+        CALCULATETABLE(
+            SUMMARIZE( rms_disruptions, rms_disruptions[red], rms_disruptions[ciudad],
+                "_ev",   CALCULATE( DISTINCTCOUNT( rms_disruptions[id] ), rms_disruptions[servicio] = "Internet" ),
+                "_afec", CALCULATE( SUMX( rms_disruptions, rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 ), rms_disruptions[servicio] = "Internet" ) * 24
+            ),
+            rms_disruptions[servicio] = "Internet"
+        ),
+        NOT ISBLANK( [_ev] ) && [_ev] > 0
+    )
+VAR _total   = COUNTROWS( _base )
+VAR _cumplen = COUNTROWS( FILTER( _base, DIVIDE( _hp - [_afec], _hp ) >= _umbral ) )
+RETURN DIVIDE( _cumplen, _total, BLANK() )
+
+-- HTML_KPI_TotalEventos_dis  ·  tabla Medidas
+HTML_KPI_TotalEventos_dis =
+VAR _val  = [Cant_Eventos_inc]
+VAR _fort = [Cant_Fortuitos_inc]
+VAR _prog = [Cant_Programados_inc]
+VAR _c    = "#4A0E5C"
+VAR _punto = UNICHAR(183)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _c & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:700;color:#3A0A4A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>Total Eventos Red</div>"
+& "<div style='font-size:30px;font-weight:800;color:" & _c & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val),"-",FORMAT(_val,"#,0")) & "</div>"
+& "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'>"
+  & "<span style='font-size:12px;font-weight:600;color:#2D2D2D;'>Servicio Internet</span>"
+& "</div>"
+& "<div style='background:#DEB8E6;border-radius:4px;padding:5px 10px;display:inline-block;'>"
+  & "<span style='font-size:12px;font-weight:700;color:#3A0A4A;'>" & FORMAT(COALESCE(_fort,0),"#,0") & " fort " & _punto & " " & FORMAT(COALESCE(_prog,0),"#,0") & " prog</span>"
+& "</div></div>"
+
+-- HTML_KPI_MTBF_dis  ·  tabla Medidas
+HTML_KPI_MTBF_dis =
+VAR _val   = [MTBF_inc]
+VAR _nodos = [Nodos_Incumplen_MTBF_inc]
+VAR _pct   = [Pct_Cumple_MTBF_inc]
+VAR _es_ok = NOT ISBLANK(_val) && _val >= 7
+VAR _ca    = IF(_es_ok, "#145C2E", "#7F0000")
+VAR _cb    = IF(_es_ok, "#C8E6C9", "#FFCDD2")
+VAR _ct    = IF(_es_ok, "#0A3D0A", "#5C0000")
+VAR _est   = IF(_es_ok, "OK", "CRITICO")
+VAR _bw    = FORMAT(ROUND(COALESCE(_pct,0)*100,0),"0")
+VAR _punto = UNICHAR(183)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _ca & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:700;color:#3A0A4A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>MTBF promedio</div>"
+& "<div style='font-size:30px;font-weight:800;color:" & _ca & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val),"-",FORMAT(_val,"0.00")) & "</div>"
+& "<div style='display:flex;justify-content:space-between;margin-bottom:6px;'>"
+  & "<span style='font-size:12px;font-weight:600;color:#2D2D2D;'>d" & UNICHAR(237) & "as " & _punto & " umbral > 7d</span>"
+  & "<span style='font-size:13px;font-weight:700;color:" & _ct & ";'>" & IF(ISBLANK(_pct),"-",FORMAT(_pct,"0.0%")) & "</span>"
+& "</div>"
+& "<div style='height:5px;background:#D8B8E8;border-radius:3px;overflow:hidden;margin-bottom:8px;'><div style='height:100%;width:" & _bw & "%;background:" & _ca & ";border-radius:3px;'></div></div>"
+& "<div style='display:flex;justify-content:space-between;'>"
+  & "<div style='background:" & _cb & ";border-radius:4px;padding:5px 10px;'><span style='font-size:12px;font-weight:800;color:" & _ct & ";'>" & _est & "</span></div>"
+  & "<span style='font-size:12px;font-weight:700;color:#3A0A4A;'>" & FORMAT(COALESCE(_nodos,0),"0") & " incumplen</span>"
+& "</div></div>"
+
+-- HTML_KPI_Uptime_dis  ·  tabla Medidas
+HTML_KPI_Uptime_dis =
+VAR _val   = [Uptime_inc]
+VAR _tec   = SELECTEDVALUE(rms_disruptions[tec], "HFC")
+VAR _umb   = IF(_tec = "GPON", 0.998, 0.995)
+VAR _nodos = [Nodos_Incumplen_Uptime_inc]
+VAR _pct   = [Pct_Cumple_Uptime_inc]
+VAR _es_ok = NOT ISBLANK(_val) && _val >= _umb
+VAR _es_al = NOT ISBLANK(_val) && _val >= (_umb - 0.01) && _val < _umb
+VAR _ca    = IF(_es_ok, "#145C2E", IF(_es_al, "#7F3000", "#7F0000"))
+VAR _cb    = IF(_es_ok, "#C8E6C9", IF(_es_al, "#FFE0B2", "#FFCDD2"))
+VAR _ct    = IF(_es_ok, "#0A3D0A", IF(_es_al, "#5C2000", "#5C0000"))
+VAR _est   = IF(_es_ok, "OK", IF(_es_al, "ALERTA", "CRITICO"))
+VAR _bw    = FORMAT(ROUND(COALESCE(_pct,0)*100,0),"0")
+VAR _utxt  = IF(_tec = "GPON", "> 99,8%", "> 99,5%")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _ca & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:700;color:#3A0A4A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>Uptime promedio</div>"
+& "<div style='font-size:30px;font-weight:800;color:" & _ca & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val),"-",FORMAT(_val,"0.00%")) & "</div>"
+& "<div style='display:flex;justify-content:space-between;margin-bottom:6px;'>"
+  & "<span style='font-size:12px;font-weight:600;color:#2D2D2D;'>umbral " & _utxt & "</span>"
+  & "<span style='font-size:13px;font-weight:700;color:" & _ct & ";'>" & IF(ISBLANK(_pct),"-",FORMAT(_pct,"0.0%")) & "</span>"
+& "</div>"
+& "<div style='height:5px;background:#D8B8E8;border-radius:3px;overflow:hidden;margin-bottom:8px;'><div style='height:100%;width:" & _bw & "%;background:" & _ca & ";border-radius:3px;'></div></div>"
+& "<div style='display:flex;justify-content:space-between;'>"
+  & "<div style='background:" & _cb & ";border-radius:4px;padding:5px 10px;'><span style='font-size:12px;font-weight:800;color:" & _ct & ";'>" & _est & "</span></div>"
+  & "<span style='font-size:12px;font-weight:700;color:#3A0A4A;'>" & FORMAT(COALESCE(_nodos,0),"0") & " ramales incumplen</span>"
+& "</div></div>"
+
+-- HTML_KPI_NodosCriticos_dis  ·  tabla Medidas
+HTML_KPI_NodosCriticos_dis =
+VAR _crit  = [Nodos_Criticos_inc]
+VAR _mtbfn = [Nodos_Incumplen_MTBF_inc]
+VAR _uptn  = [Nodos_Incumplen_Uptime_inc]
+VAR _alto  = NOT ISBLANK(_crit) && _crit > 0
+VAR _ca    = IF(_alto, "#7F0000", "#145C2E")
+VAR _cb    = IF(_alto, "#FFCDD2", "#C8E6C9")
+VAR _ct    = IF(_alto, "#5C0000", "#0A3D0A")
+VAR _est   = IF(_alto, "CRITICO", "OK")
+VAR _punto = UNICHAR(183)
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _ca & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:700;color:#3A0A4A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>Nodos cr" & UNICHAR(237) & "ticos</div>"
+& "<div style='font-size:30px;font-weight:800;color:" & _ca & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_crit),"-",FORMAT(_crit,"#,0")) & "</div>"
+& "<div style='display:flex;justify-content:space-between;margin-bottom:8px;'>"
+  & "<span style='font-size:12px;font-weight:600;color:#2D2D2D;'>incumplen MTBF y Uptime</span>"
+& "</div>"
+& "<div style='display:flex;justify-content:space-between;'>"
+  & "<div style='background:" & _cb & ";border-radius:4px;padding:5px 10px;'><span style='font-size:12px;font-weight:800;color:" & _ct & ";'>" & _est & "</span></div>"
+  & "<span style='font-size:12px;font-weight:700;color:#3A0A4A;'>MTBF: " & FORMAT(COALESCE(_mtbfn,0),"0") & " " & _punto & " UPT: " & FORMAT(COALESCE(_uptn,0),"0") & "</span>"
+& "</div></div>"
+
+-- HTML_KPI_PctMTBF_dis  ·  tabla Medidas
+HTML_KPI_PctMTBF_dis =
+VAR _val   = [Pct_Cumple_MTBF_inc]
+VAR _nodos = [Nodos_Incumplen_MTBF_inc]
+VAR _es_ok = NOT ISBLANK(_val) && _val >= 0.95
+VAR _es_al = NOT ISBLANK(_val) && _val >= 0.90 && _val < 0.95
+VAR _ca    = IF(_es_ok, "#145C2E", IF(_es_al, "#7F3000", "#7F0000"))
+VAR _cb    = IF(_es_ok, "#C8E6C9", IF(_es_al, "#FFE0B2", "#FFCDD2"))
+VAR _ct    = IF(_es_ok, "#0A3D0A", IF(_es_al, "#5C2000", "#5C0000"))
+VAR _est   = IF(_es_ok, "OK", IF(_es_al, "ALERTA", "CRITICO"))
+VAR _bw    = FORMAT(ROUND(COALESCE(_val,0)*100,0),"0")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _ca & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:700;color:#3A0A4A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>% Cumple MTBF</div>"
+& "<div style='font-size:30px;font-weight:800;color:" & _ca & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val),"-",FORMAT(_val,"0.00%")) & "</div>"
+& "<div style='display:flex;justify-content:space-between;margin-bottom:6px;'>"
+  & "<span style='font-size:12px;font-weight:600;color:#2D2D2D;'>nodos > 7 d" & UNICHAR(237) & "as MTBF</span>"
+  & "<span style='font-size:13px;font-weight:700;color:" & _ct & ";'>" & FORMAT(COALESCE(_nodos,0),"0") & " incumplen</span>"
+& "</div>"
+& "<div style='height:5px;background:#D8B8E8;border-radius:3px;overflow:hidden;margin-bottom:8px;'><div style='height:100%;width:" & _bw & "%;background:" & _ca & ";border-radius:3px;'></div></div>"
+& "<div style='background:" & _cb & ";border-radius:4px;padding:5px 10px;display:inline-block;'>"
+  & "<span style='font-size:12px;font-weight:800;color:" & _ct & ";'>" & _est & "</span>"
+& "</div></div>"
+
+-- HTML_KPI_PctUptime_dis  ·  tabla Medidas
+HTML_KPI_PctUptime_dis =
+VAR _val   = [Pct_Cumple_Uptime_inc]
+VAR _tec   = SELECTEDVALUE(rms_disruptions[tec], "HFC")
+VAR _nodos = [Nodos_Incumplen_Uptime_inc]
+VAR _es_ok = NOT ISBLANK(_val) && _val >= 0.95
+VAR _es_al = NOT ISBLANK(_val) && _val >= 0.90 && _val < 0.95
+VAR _ca    = IF(_es_ok, "#0C447C", IF(_es_al, "#7F3000", "#7F0000"))
+VAR _cb    = IF(_es_ok, "#BBDEFB", IF(_es_al, "#FFE0B2", "#FFCDD2"))
+VAR _ct    = IF(_es_ok, "#062E5C", IF(_es_al, "#5C2000", "#5C0000"))
+VAR _est   = IF(_es_ok, "OK", IF(_es_al, "ALERTA", "CRITICO"))
+VAR _bw    = FORMAT(ROUND(COALESCE(_val,0)*100,0),"0")
+VAR _utxt  = IF(_tec = "GPON", "> 99,8%", "> 99,5%")
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;background:#fff;border:1px solid #C9A8D8;border-top:5px solid " & _ca & ";border-radius:4px;padding:16px 18px;'>"
+& "<div style='font-size:12px;font-weight:700;color:#3A0A4A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>% Cumple Uptime</div>"
+& "<div style='font-size:30px;font-weight:800;color:" & _ca & ";line-height:1;margin-bottom:8px;'>" & IF(ISBLANK(_val),"-",FORMAT(_val,"0.00%")) & "</div>"
+& "<div style='display:flex;justify-content:space-between;margin-bottom:6px;'>"
+  & "<span style='font-size:12px;font-weight:600;color:#2D2D2D;'>nodos " & _utxt & " Uptime</span>"
+  & "<span style='font-size:13px;font-weight:700;color:" & _ct & ";'>" & FORMAT(COALESCE(_nodos,0),"0") & " incumplen</span>"
+& "</div>"
+& "<div style='height:5px;background:#D8B8E8;border-radius:3px;overflow:hidden;margin-bottom:8px;'><div style='height:100%;width:" & _bw & "%;background:" & _ca & ";border-radius:3px;'></div></div>"
+& "<div style='background:" & _cb & ";border-radius:4px;padding:5px 10px;display:inline-block;'>"
+  & "<span style='font-size:12px;font-weight:800;color:" & _ct & ";'>" & _est & "</span>"
+& "</div></div>"
+
+-- HTML_Heatmap_Eventos_dis  ·  tabla Medidas
+HTML_Heatmap_Eventos_dis =
+VAR _data =
+    ADDCOLUMNS(
+        CROSSJOIN(
+            VALUES( rms_disruptions[Rango_Hora] ),
+            VALUES( rms_disruptions[Day_dis_nombre] )
+        ),
+        "_ev", CALCULATE( [Cant_Eventos_inc] )
+    )
+VAR _max = MAXX( _data, [_ev] )
+VAR _min = MINX( FILTER( _data, NOT ISBLANK([_ev]) ), [_ev] )
+VAR _td = "padding:10px 6px;text-align:center;font-size:12px;font-weight:600;border:1px solid #C9A8D8;"
+
+VAR _header =
+    "<tr>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:90px;'>Rango</th>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:45px;'>lun</th>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:45px;'>mar</th>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:45px;'>mi&#233;</th>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:45px;'>jue</th>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:45px;'>vie</th>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:45px;'>s&#225;b</th>"
+    & "<th style='background:#6B1F7C;color:white;padding:7px 10px;font-size:11px;border:1px solid #4A1557;min-width:45px;'>dom</th>"
+    & "</tr>"
+
+// dias con tilde exactos de la columna
+VAR _d_mie = "mi" & UNICHAR(233)  // mié
+VAR _d_sab = "s" & UNICHAR(225) & "b"  // sáb
+
+VAR _fila_h1 =
+    VAR _h = "00:00 - 04:00"
+    VAR _lun = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="lun" ), [_ev] )
+    VAR _mar = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="mar" ), [_ev] )
+    VAR _mie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_mie ), [_ev] )
+    VAR _jue = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="jue" ), [_ev] )
+    VAR _vie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="vie" ), [_ev] )
+    VAR _sab = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_sab ), [_ev] )
+    VAR _dom = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="dom" ), [_ev] )
+    VAR _il=DIVIDE(COALESCE(_lun,0)-_min,_max-_min,0) VAR _im=DIVIDE(COALESCE(_mar,0)-_min,_max-_min,0) VAR _ii=DIVIDE(COALESCE(_mie,0)-_min,_max-_min,0) VAR _ij=DIVIDE(COALESCE(_jue,0)-_min,_max-_min,0) VAR _iv=DIVIDE(COALESCE(_vie,0)-_min,_max-_min,0) VAR _is=DIVIDE(COALESCE(_sab,0)-_min,_max-_min,0) VAR _id=DIVIDE(COALESCE(_dom,0)-_min,_max-_min,0)
+    VAR _cl="rgb("&FORMAT(INT(243-(243-137)*_il),"0")&","&FORMAT(INT(234-(234-51)*_il),"0")&","&FORMAT(INT(247-(247-149)*_il),"0")&")" VAR _cm="rgb("&FORMAT(INT(243-(243-137)*_im),"0")&","&FORMAT(INT(234-(234-51)*_im),"0")&","&FORMAT(INT(247-(247-149)*_im),"0")&")" VAR _ci="rgb("&FORMAT(INT(243-(243-137)*_ii),"0")&","&FORMAT(INT(234-(234-51)*_ii),"0")&","&FORMAT(INT(247-(247-149)*_ii),"0")&")" VAR _cj="rgb("&FORMAT(INT(243-(243-137)*_ij),"0")&","&FORMAT(INT(234-(234-51)*_ij),"0")&","&FORMAT(INT(247-(247-149)*_ij),"0")&")" VAR _cv="rgb("&FORMAT(INT(243-(243-137)*_iv),"0")&","&FORMAT(INT(234-(234-51)*_iv),"0")&","&FORMAT(INT(247-(247-149)*_iv),"0")&")" VAR _cs="rgb("&FORMAT(INT(243-(243-137)*_is),"0")&","&FORMAT(INT(234-(234-51)*_is),"0")&","&FORMAT(INT(247-(247-149)*_is),"0")&")" VAR _cd="rgb("&FORMAT(INT(243-(243-137)*_id),"0")&","&FORMAT(INT(234-(234-51)*_id),"0")&","&FORMAT(INT(247-(247-149)*_id),"0")&")"
+    VAR _tl=IF(_il>0.5,"#fff","#3C1048") VAR _tm=IF(_im>0.5,"#fff","#3C1048") VAR _ti=IF(_ii>0.5,"#fff","#3C1048") VAR _tj=IF(_ij>0.5,"#fff","#3C1048") VAR _tv=IF(_iv>0.5,"#fff","#3C1048") VAR _ts=IF(_is>0.5,"#fff","#3C1048") VAR _td2=IF(_id>0.5,"#fff","#3C1048")
+    RETURN "<tr><td style='background:#F3EAF7;color:#6B1F7C;padding:7px 10px;font-size:11px;border:1px solid #C9A8D8;white-space:nowrap;'>"&_h&"</td>"
+    &"<td style='"&_td&"background:"&_cl&";color:"&_tl&"'>"&IF(ISBLANK(_lun),"-",FORMAT(_lun,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cm&";color:"&_tm&"'>"&IF(ISBLANK(_mar),"-",FORMAT(_mar,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_ci&";color:"&_ti&"'>"&IF(ISBLANK(_mie),"-",FORMAT(_mie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cj&";color:"&_tj&"'>"&IF(ISBLANK(_jue),"-",FORMAT(_jue,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cv&";color:"&_tv&"'>"&IF(ISBLANK(_vie),"-",FORMAT(_vie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cs&";color:"&_ts&"'>"&IF(ISBLANK(_sab),"-",FORMAT(_sab,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cd&";color:"&_td2&"'>"&IF(ISBLANK(_dom),"-",FORMAT(_dom,"0"))&"</td></tr>"
+
+VAR _fila_h2 =
+    VAR _h = "04:00 - 08:00"
+    VAR _lun = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="lun" ), [_ev] )
+    VAR _mar = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="mar" ), [_ev] )
+    VAR _mie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_mie ), [_ev] )
+    VAR _jue = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="jue" ), [_ev] )
+    VAR _vie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="vie" ), [_ev] )
+    VAR _sab = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_sab ), [_ev] )
+    VAR _dom = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="dom" ), [_ev] )
+    VAR _il=DIVIDE(COALESCE(_lun,0)-_min,_max-_min,0) VAR _im=DIVIDE(COALESCE(_mar,0)-_min,_max-_min,0) VAR _ii=DIVIDE(COALESCE(_mie,0)-_min,_max-_min,0) VAR _ij=DIVIDE(COALESCE(_jue,0)-_min,_max-_min,0) VAR _iv=DIVIDE(COALESCE(_vie,0)-_min,_max-_min,0) VAR _is=DIVIDE(COALESCE(_sab,0)-_min,_max-_min,0) VAR _id=DIVIDE(COALESCE(_dom,0)-_min,_max-_min,0)
+    VAR _cl="rgb("&FORMAT(INT(243-(243-137)*_il),"0")&","&FORMAT(INT(234-(234-51)*_il),"0")&","&FORMAT(INT(247-(247-149)*_il),"0")&")" VAR _cm="rgb("&FORMAT(INT(243-(243-137)*_im),"0")&","&FORMAT(INT(234-(234-51)*_im),"0")&","&FORMAT(INT(247-(247-149)*_im),"0")&")" VAR _ci="rgb("&FORMAT(INT(243-(243-137)*_ii),"0")&","&FORMAT(INT(234-(234-51)*_ii),"0")&","&FORMAT(INT(247-(247-149)*_ii),"0")&")" VAR _cj="rgb("&FORMAT(INT(243-(243-137)*_ij),"0")&","&FORMAT(INT(234-(234-51)*_ij),"0")&","&FORMAT(INT(247-(247-149)*_ij),"0")&")" VAR _cv="rgb("&FORMAT(INT(243-(243-137)*_iv),"0")&","&FORMAT(INT(234-(234-51)*_iv),"0")&","&FORMAT(INT(247-(247-149)*_iv),"0")&")" VAR _cs="rgb("&FORMAT(INT(243-(243-137)*_is),"0")&","&FORMAT(INT(234-(234-51)*_is),"0")&","&FORMAT(INT(247-(247-149)*_is),"0")&")" VAR _cd="rgb("&FORMAT(INT(243-(243-137)*_id),"0")&","&FORMAT(INT(234-(234-51)*_id),"0")&","&FORMAT(INT(247-(247-149)*_id),"0")&")"
+    VAR _tl=IF(_il>0.5,"#fff","#3C1048") VAR _tm=IF(_im>0.5,"#fff","#3C1048") VAR _ti=IF(_ii>0.5,"#fff","#3C1048") VAR _tj=IF(_ij>0.5,"#fff","#3C1048") VAR _tv=IF(_iv>0.5,"#fff","#3C1048") VAR _ts=IF(_is>0.5,"#fff","#3C1048") VAR _td2=IF(_id>0.5,"#fff","#3C1048")
+    RETURN "<tr><td style='background:#F3EAF7;color:#6B1F7C;padding:7px 10px;font-size:11px;border:1px solid #C9A8D8;white-space:nowrap;'>"&_h&"</td>"
+    &"<td style='"&_td&"background:"&_cl&";color:"&_tl&"'>"&IF(ISBLANK(_lun),"-",FORMAT(_lun,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cm&";color:"&_tm&"'>"&IF(ISBLANK(_mar),"-",FORMAT(_mar,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_ci&";color:"&_ti&"'>"&IF(ISBLANK(_mie),"-",FORMAT(_mie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cj&";color:"&_tj&"'>"&IF(ISBLANK(_jue),"-",FORMAT(_jue,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cv&";color:"&_tv&"'>"&IF(ISBLANK(_vie),"-",FORMAT(_vie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cs&";color:"&_ts&"'>"&IF(ISBLANK(_sab),"-",FORMAT(_sab,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cd&";color:"&_td2&"'>"&IF(ISBLANK(_dom),"-",FORMAT(_dom,"0"))&"</td></tr>"
+
+VAR _fila_h3 =
+    VAR _h = "08:00 - 12:00"
+    VAR _lun = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="lun" ), [_ev] )
+    VAR _mar = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="mar" ), [_ev] )
+    VAR _mie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_mie ), [_ev] )
+    VAR _jue = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="jue" ), [_ev] )
+    VAR _vie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="vie" ), [_ev] )
+    VAR _sab = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_sab ), [_ev] )
+    VAR _dom = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="dom" ), [_ev] )
+    VAR _il=DIVIDE(COALESCE(_lun,0)-_min,_max-_min,0) VAR _im=DIVIDE(COALESCE(_mar,0)-_min,_max-_min,0) VAR _ii=DIVIDE(COALESCE(_mie,0)-_min,_max-_min,0) VAR _ij=DIVIDE(COALESCE(_jue,0)-_min,_max-_min,0) VAR _iv=DIVIDE(COALESCE(_vie,0)-_min,_max-_min,0) VAR _is=DIVIDE(COALESCE(_sab,0)-_min,_max-_min,0) VAR _id=DIVIDE(COALESCE(_dom,0)-_min,_max-_min,0)
+    VAR _cl="rgb("&FORMAT(INT(243-(243-137)*_il),"0")&","&FORMAT(INT(234-(234-51)*_il),"0")&","&FORMAT(INT(247-(247-149)*_il),"0")&")" VAR _cm="rgb("&FORMAT(INT(243-(243-137)*_im),"0")&","&FORMAT(INT(234-(234-51)*_im),"0")&","&FORMAT(INT(247-(247-149)*_im),"0")&")" VAR _ci="rgb("&FORMAT(INT(243-(243-137)*_ii),"0")&","&FORMAT(INT(234-(234-51)*_ii),"0")&","&FORMAT(INT(247-(247-149)*_ii),"0")&")" VAR _cj="rgb("&FORMAT(INT(243-(243-137)*_ij),"0")&","&FORMAT(INT(234-(234-51)*_ij),"0")&","&FORMAT(INT(247-(247-149)*_ij),"0")&")" VAR _cv="rgb("&FORMAT(INT(243-(243-137)*_iv),"0")&","&FORMAT(INT(234-(234-51)*_iv),"0")&","&FORMAT(INT(247-(247-149)*_iv),"0")&")" VAR _cs="rgb("&FORMAT(INT(243-(243-137)*_is),"0")&","&FORMAT(INT(234-(234-51)*_is),"0")&","&FORMAT(INT(247-(247-149)*_is),"0")&")" VAR _cd="rgb("&FORMAT(INT(243-(243-137)*_id),"0")&","&FORMAT(INT(234-(234-51)*_id),"0")&","&FORMAT(INT(247-(247-149)*_id),"0")&")"
+    VAR _tl=IF(_il>0.5,"#fff","#3C1048") VAR _tm=IF(_im>0.5,"#fff","#3C1048") VAR _ti=IF(_ii>0.5,"#fff","#3C1048") VAR _tj=IF(_ij>0.5,"#fff","#3C1048") VAR _tv=IF(_iv>0.5,"#fff","#3C1048") VAR _ts=IF(_is>0.5,"#fff","#3C1048") VAR _td2=IF(_id>0.5,"#fff","#3C1048")
+    RETURN "<tr><td style='background:#F3EAF7;color:#6B1F7C;padding:7px 10px;font-size:11px;border:1px solid #C9A8D8;white-space:nowrap;'>"&_h&"</td>"
+    &"<td style='"&_td&"background:"&_cl&";color:"&_tl&"'>"&IF(ISBLANK(_lun),"-",FORMAT(_lun,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cm&";color:"&_tm&"'>"&IF(ISBLANK(_mar),"-",FORMAT(_mar,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_ci&";color:"&_ti&"'>"&IF(ISBLANK(_mie),"-",FORMAT(_mie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cj&";color:"&_tj&"'>"&IF(ISBLANK(_jue),"-",FORMAT(_jue,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cv&";color:"&_tv&"'>"&IF(ISBLANK(_vie),"-",FORMAT(_vie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cs&";color:"&_ts&"'>"&IF(ISBLANK(_sab),"-",FORMAT(_sab,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cd&";color:"&_td2&"'>"&IF(ISBLANK(_dom),"-",FORMAT(_dom,"0"))&"</td></tr>"
+
+VAR _fila_h4 =
+    VAR _h = "12:00 - 16:00"
+    VAR _lun = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="lun" ), [_ev] )
+    VAR _mar = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="mar" ), [_ev] )
+    VAR _mie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_mie ), [_ev] )
+    VAR _jue = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="jue" ), [_ev] )
+    VAR _vie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="vie" ), [_ev] )
+    VAR _sab = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_sab ), [_ev] )
+    VAR _dom = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="dom" ), [_ev] )
+    VAR _il=DIVIDE(COALESCE(_lun,0)-_min,_max-_min,0) VAR _im=DIVIDE(COALESCE(_mar,0)-_min,_max-_min,0) VAR _ii=DIVIDE(COALESCE(_mie,0)-_min,_max-_min,0) VAR _ij=DIVIDE(COALESCE(_jue,0)-_min,_max-_min,0) VAR _iv=DIVIDE(COALESCE(_vie,0)-_min,_max-_min,0) VAR _is=DIVIDE(COALESCE(_sab,0)-_min,_max-_min,0) VAR _id=DIVIDE(COALESCE(_dom,0)-_min,_max-_min,0)
+    VAR _cl="rgb("&FORMAT(INT(243-(243-137)*_il),"0")&","&FORMAT(INT(234-(234-51)*_il),"0")&","&FORMAT(INT(247-(247-149)*_il),"0")&")" VAR _cm="rgb("&FORMAT(INT(243-(243-137)*_im),"0")&","&FORMAT(INT(234-(234-51)*_im),"0")&","&FORMAT(INT(247-(247-149)*_im),"0")&")" VAR _ci="rgb("&FORMAT(INT(243-(243-137)*_ii),"0")&","&FORMAT(INT(234-(234-51)*_ii),"0")&","&FORMAT(INT(247-(247-149)*_ii),"0")&")" VAR _cj="rgb("&FORMAT(INT(243-(243-137)*_ij),"0")&","&FORMAT(INT(234-(234-51)*_ij),"0")&","&FORMAT(INT(247-(247-149)*_ij),"0")&")" VAR _cv="rgb("&FORMAT(INT(243-(243-137)*_iv),"0")&","&FORMAT(INT(234-(234-51)*_iv),"0")&","&FORMAT(INT(247-(247-149)*_iv),"0")&")" VAR _cs="rgb("&FORMAT(INT(243-(243-137)*_is),"0")&","&FORMAT(INT(234-(234-51)*_is),"0")&","&FORMAT(INT(247-(247-149)*_is),"0")&")" VAR _cd="rgb("&FORMAT(INT(243-(243-137)*_id),"0")&","&FORMAT(INT(234-(234-51)*_id),"0")&","&FORMAT(INT(247-(247-149)*_id),"0")&")"
+    VAR _tl=IF(_il>0.5,"#fff","#3C1048") VAR _tm=IF(_im>0.5,"#fff","#3C1048") VAR _ti=IF(_ii>0.5,"#fff","#3C1048") VAR _tj=IF(_ij>0.5,"#fff","#3C1048") VAR _tv=IF(_iv>0.5,"#fff","#3C1048") VAR _ts=IF(_is>0.5,"#fff","#3C1048") VAR _td2=IF(_id>0.5,"#fff","#3C1048")
+    RETURN "<tr><td style='background:#F3EAF7;color:#6B1F7C;padding:7px 10px;font-size:11px;border:1px solid #C9A8D8;white-space:nowrap;'>"&_h&"</td>"
+    &"<td style='"&_td&"background:"&_cl&";color:"&_tl&"'>"&IF(ISBLANK(_lun),"-",FORMAT(_lun,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cm&";color:"&_tm&"'>"&IF(ISBLANK(_mar),"-",FORMAT(_mar,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_ci&";color:"&_ti&"'>"&IF(ISBLANK(_mie),"-",FORMAT(_mie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cj&";color:"&_tj&"'>"&IF(ISBLANK(_jue),"-",FORMAT(_jue,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cv&";color:"&_tv&"'>"&IF(ISBLANK(_vie),"-",FORMAT(_vie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cs&";color:"&_ts&"'>"&IF(ISBLANK(_sab),"-",FORMAT(_sab,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cd&";color:"&_td2&"'>"&IF(ISBLANK(_dom),"-",FORMAT(_dom,"0"))&"</td></tr>"
+
+VAR _fila_h5 =
+    VAR _h = "16:00 - 20:00"
+    VAR _lun = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="lun" ), [_ev] )
+    VAR _mar = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="mar" ), [_ev] )
+    VAR _mie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_mie ), [_ev] )
+    VAR _jue = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="jue" ), [_ev] )
+    VAR _vie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="vie" ), [_ev] )
+    VAR _sab = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_sab ), [_ev] )
+    VAR _dom = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="dom" ), [_ev] )
+    VAR _il=DIVIDE(COALESCE(_lun,0)-_min,_max-_min,0) VAR _im=DIVIDE(COALESCE(_mar,0)-_min,_max-_min,0) VAR _ii=DIVIDE(COALESCE(_mie,0)-_min,_max-_min,0) VAR _ij=DIVIDE(COALESCE(_jue,0)-_min,_max-_min,0) VAR _iv=DIVIDE(COALESCE(_vie,0)-_min,_max-_min,0) VAR _is=DIVIDE(COALESCE(_sab,0)-_min,_max-_min,0) VAR _id=DIVIDE(COALESCE(_dom,0)-_min,_max-_min,0)
+    VAR _cl="rgb("&FORMAT(INT(243-(243-137)*_il),"0")&","&FORMAT(INT(234-(234-51)*_il),"0")&","&FORMAT(INT(247-(247-149)*_il),"0")&")" VAR _cm="rgb("&FORMAT(INT(243-(243-137)*_im),"0")&","&FORMAT(INT(234-(234-51)*_im),"0")&","&FORMAT(INT(247-(247-149)*_im),"0")&")" VAR _ci="rgb("&FORMAT(INT(243-(243-137)*_ii),"0")&","&FORMAT(INT(234-(234-51)*_ii),"0")&","&FORMAT(INT(247-(247-149)*_ii),"0")&")" VAR _cj="rgb("&FORMAT(INT(243-(243-137)*_ij),"0")&","&FORMAT(INT(234-(234-51)*_ij),"0")&","&FORMAT(INT(247-(247-149)*_ij),"0")&")" VAR _cv="rgb("&FORMAT(INT(243-(243-137)*_iv),"0")&","&FORMAT(INT(234-(234-51)*_iv),"0")&","&FORMAT(INT(247-(247-149)*_iv),"0")&")" VAR _cs="rgb("&FORMAT(INT(243-(243-137)*_is),"0")&","&FORMAT(INT(234-(234-51)*_is),"0")&","&FORMAT(INT(247-(247-149)*_is),"0")&")" VAR _cd="rgb("&FORMAT(INT(243-(243-137)*_id),"0")&","&FORMAT(INT(234-(234-51)*_id),"0")&","&FORMAT(INT(247-(247-149)*_id),"0")&")"
+    VAR _tl=IF(_il>0.5,"#fff","#3C1048") VAR _tm=IF(_im>0.5,"#fff","#3C1048") VAR _ti=IF(_ii>0.5,"#fff","#3C1048") VAR _tj=IF(_ij>0.5,"#fff","#3C1048") VAR _tv=IF(_iv>0.5,"#fff","#3C1048") VAR _ts=IF(_is>0.5,"#fff","#3C1048") VAR _td2=IF(_id>0.5,"#fff","#3C1048")
+    RETURN "<tr><td style='background:#F3EAF7;color:#6B1F7C;padding:7px 10px;font-size:11px;border:1px solid #C9A8D8;white-space:nowrap;'>"&_h&"</td>"
+    &"<td style='"&_td&"background:"&_cl&";color:"&_tl&"'>"&IF(ISBLANK(_lun),"-",FORMAT(_lun,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cm&";color:"&_tm&"'>"&IF(ISBLANK(_mar),"-",FORMAT(_mar,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_ci&";color:"&_ti&"'>"&IF(ISBLANK(_mie),"-",FORMAT(_mie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cj&";color:"&_tj&"'>"&IF(ISBLANK(_jue),"-",FORMAT(_jue,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cv&";color:"&_tv&"'>"&IF(ISBLANK(_vie),"-",FORMAT(_vie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cs&";color:"&_ts&"'>"&IF(ISBLANK(_sab),"-",FORMAT(_sab,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cd&";color:"&_td2&"'>"&IF(ISBLANK(_dom),"-",FORMAT(_dom,"0"))&"</td></tr>"
+
+VAR _fila_h6 =
+    VAR _h = "20:00 - 24:00"
+    VAR _lun = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="lun" ), [_ev] )
+    VAR _mar = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="mar" ), [_ev] )
+    VAR _mie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_mie ), [_ev] )
+    VAR _jue = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="jue" ), [_ev] )
+    VAR _vie = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="vie" ), [_ev] )
+    VAR _sab = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]=_d_sab ), [_ev] )
+    VAR _dom = MAXX( FILTER( _data, rms_disruptions[Rango_Hora]=_h && rms_disruptions[Day_dis_nombre]="dom" ), [_ev] )
+    VAR _il=DIVIDE(COALESCE(_lun,0)-_min,_max-_min,0) VAR _im=DIVIDE(COALESCE(_mar,0)-_min,_max-_min,0) VAR _ii=DIVIDE(COALESCE(_mie,0)-_min,_max-_min,0) VAR _ij=DIVIDE(COALESCE(_jue,0)-_min,_max-_min,0) VAR _iv=DIVIDE(COALESCE(_vie,0)-_min,_max-_min,0) VAR _is=DIVIDE(COALESCE(_sab,0)-_min,_max-_min,0) VAR _id=DIVIDE(COALESCE(_dom,0)-_min,_max-_min,0)
+    VAR _cl="rgb("&FORMAT(INT(243-(243-137)*_il),"0")&","&FORMAT(INT(234-(234-51)*_il),"0")&","&FORMAT(INT(247-(247-149)*_il),"0")&")" VAR _cm="rgb("&FORMAT(INT(243-(243-137)*_im),"0")&","&FORMAT(INT(234-(234-51)*_im),"0")&","&FORMAT(INT(247-(247-149)*_im),"0")&")" VAR _ci="rgb("&FORMAT(INT(243-(243-137)*_ii),"0")&","&FORMAT(INT(234-(234-51)*_ii),"0")&","&FORMAT(INT(247-(247-149)*_ii),"0")&")" VAR _cj="rgb("&FORMAT(INT(243-(243-137)*_ij),"0")&","&FORMAT(INT(234-(234-51)*_ij),"0")&","&FORMAT(INT(247-(247-149)*_ij),"0")&")" VAR _cv="rgb("&FORMAT(INT(243-(243-137)*_iv),"0")&","&FORMAT(INT(234-(234-51)*_iv),"0")&","&FORMAT(INT(247-(247-149)*_iv),"0")&")" VAR _cs="rgb("&FORMAT(INT(243-(243-137)*_is),"0")&","&FORMAT(INT(234-(234-51)*_is),"0")&","&FORMAT(INT(247-(247-149)*_is),"0")&")" VAR _cd="rgb("&FORMAT(INT(243-(243-137)*_id),"0")&","&FORMAT(INT(234-(234-51)*_id),"0")&","&FORMAT(INT(247-(247-149)*_id),"0")&")"
+    VAR _tl=IF(_il>0.5,"#fff","#3C1048") VAR _tm=IF(_im>0.5,"#fff","#3C1048") VAR _ti=IF(_ii>0.5,"#fff","#3C1048") VAR _tj=IF(_ij>0.5,"#fff","#3C1048") VAR _tv=IF(_iv>0.5,"#fff","#3C1048") VAR _ts=IF(_is>0.5,"#fff","#3C1048") VAR _td2=IF(_id>0.5,"#fff","#3C1048")
+    RETURN "<tr><td style='background:#F3EAF7;color:#6B1F7C;padding:7px 10px;font-size:11px;border:1px solid #C9A8D8;white-space:nowrap;'>"&_h&"</td>"
+    &"<td style='"&_td&"background:"&_cl&";color:"&_tl&"'>"&IF(ISBLANK(_lun),"-",FORMAT(_lun,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cm&";color:"&_tm&"'>"&IF(ISBLANK(_mar),"-",FORMAT(_mar,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_ci&";color:"&_ti&"'>"&IF(ISBLANK(_mie),"-",FORMAT(_mie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cj&";color:"&_tj&"'>"&IF(ISBLANK(_jue),"-",FORMAT(_jue,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cv&";color:"&_tv&"'>"&IF(ISBLANK(_vie),"-",FORMAT(_vie,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cs&";color:"&_ts&"'>"&IF(ISBLANK(_sab),"-",FORMAT(_sab,"0"))&"</td>"
+    &"<td style='"&_td&"background:"&_cd&";color:"&_td2&"'>"&IF(ISBLANK(_dom),"-",FORMAT(_dom,"0"))&"</td></tr>"
+
+RETURN
+"<div style='font-family:Segoe UI,sans-serif;font-size:12px;'>"
+& "<div style='background:#6B1F7C;color:white;padding:7px 10px;font-weight:600;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;'>Eventos por rango horario y dia</div>"
+& "<table style='border-collapse:collapse;width:100%;'><thead>"&_header&"</thead>"
+& "<tbody>"&_fila_h1&_fila_h2&_fila_h3&_fila_h4&_fila_h5&_fila_h6&"</tbody></table>"
+& "<div style='margin-top:6px;display:flex;align-items:center;gap:8px;font-size:9px;color:#9B3DB8;'><span>Menos</span>"
+  & "<div style='display:flex;gap:2px;'>"
+    & "<div style='width:16px;height:10px;background:#F3EAF7;border:0.5px solid #C9A8D8;'></div>"
+    & "<div style='width:16px;height:10px;background:#DEB8E6;'></div>"
+    & "<div style='width:16px;height:10px;background:#C585D0;'></div>"
+    & "<div style='width:16px;height:10px;background:#AC52BB;'></div>"
+    & "<div style='width:16px;height:10px;background:#893395;'></div>"
+  & "</div><span>Mas</span></div></div>"
+
+-- Afectacion_Real_Horas  ·  tabla Medidas
+Afectacion_Real_Horas =
+SUMX(
+    SUMMARIZE(
+        CALCULATETABLE( rms_disruptions, rms_disruptions[servicio] = "Internet" ),
+        rms_disruptions[id],
+        "_afec",
+        CALCULATE(
+            SUMX( rms_disruptions, rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 ),
+            rms_disruptions[servicio] = "Internet"
+        )
+    ),
+    [_afec]
+) * 24
+
+-- Pct_TRFn_Por_Tipo_inc  ·  tabla Medidas
+Pct_TRFn_Por_Tipo_inc =
+VAR _tipo  = SELECTEDVALUE( vw_rms_incidents[TIPO] )
+VAR _total = CALCULATE( [Total_Eventos_inc], ALL( vw_rms_incidents[TIPO] ) )
+RETURN DIVIDE( CALCULATE( [Total_Eventos_inc] ), _total, BLANK() )
+
+-- Tasa_NoCumple_TRFn_inc  ·  tabla Medidas
+Tasa_NoCumple_TRFn_inc =
+DIVIDE( [NoCumple_TRFn_inc], [Total_Eventos_inc], BLANK() )
+
+-- Umbral_Uptime_inc  ·  tabla Medidas
+Umbral_Uptime_inc =
+VAR _tec = SELECTEDVALUE( rms_disruptions[tec], "TODOS" )
+RETURN
+    IF( _tec = "GPON", 0.998, 0.995 )
+
+-- Afectacion_Promedio_Horas  ·  tabla Medidas
+Afectacion_Promedio_Horas =
+VAR _base =
+    FILTER(
+        CALCULATETABLE(
+            SUMMARIZE( rms_disruptions, rms_disruptions[red], rms_disruptions[ciudad],
+                "_ev",   CALCULATE( DISTINCTCOUNT( rms_disruptions[id] ), rms_disruptions[servicio] = "Internet" ),
+                "_afec", CALCULATE( SUMX( rms_disruptions, rms_disruptions[afectacion_real] * rms_disruptions[porcentaje] / 100 ), rms_disruptions[servicio] = "Internet" ) * 24
+            ),
+            rms_disruptions[servicio] = "Internet"
+        ),
+        NOT ISBLANK( [_ev] ) && [_ev] > 0
+    )
+RETURN
+    AVERAGEX( _base, [_afec] )
+
+-- Cant_Nodos_con_Eventos  ·  tabla Medidas
+Cant_Nodos_con_Eventos =
+COUNTROWS(
+    FILTER(
+        CALCULATETABLE(
+            SUMMARIZE( rms_disruptions, rms_disruptions[red], rms_disruptions[ciudad],
+                "_ev", CALCULATE( DISTINCTCOUNT( rms_disruptions[id] ), rms_disruptions[servicio] = "Internet" )
+            ),
+            rms_disruptions[servicio] = "Internet"
+        ),
+        NOT ISBLANK( [_ev] ) && [_ev] > 0
+    )
+)

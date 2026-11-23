@@ -1,0 +1,546 @@
+-- Bajas  ·  tabla _Medidas
+Bajas =
+COUNTROWS ( base_flujos_desercion )
+
+-- % del total  ·  tabla _Medidas
+% del total =
+DIVIDE ( [Bajas], CALCULATE ( [Bajas], ALLSELECTED ( base_flujos_desercion ) ) )
+
+-- Bajas controlables  ·  tabla _Medidas
+Bajas controlables =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Controlable" )
+
+-- Bajas no controlables  ·  tabla _Medidas
+Bajas no controlables =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "No controlable" )
+
+-- Bajas sin información  ·  tabla _Medidas
+Bajas sin información =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Sin información" )
+
+-- % Controlables  ·  tabla _Medidas
+% Controlables =
+DIVIDE ( [Bajas controlables], [Bajas] )
+
+-- Bajas con ticket retención  ·  tabla _Medidas
+Bajas con ticket retención =
+CALCULATE ( [Bajas], base_flujos_desercion[tuvo_ticket_retencion] = 1 )
+
+-- % Pasó por retención  ·  tabla _Medidas
+% Pasó por retención =
+DIVIDE ( [Bajas con ticket retención], [Bajas] )
+
+-- % Sin ticket retención  ·  tabla _Medidas
+% Sin ticket retención =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[tuvo_ticket_retencion] = 0 ), [Bajas] )
+
+-- Bajas retenidas antes  ·  tabla _Medidas
+Bajas retenidas antes =
+CALCULATE ( [Bajas], base_flujos_desercion[retenido_previamente] = 1 )
+
+-- % Retenido antes  ·  tabla _Medidas
+% Retenido antes =
+DIVIDE ( [Bajas retenidas antes], [Bajas] )
+
+-- Bajas con contacto técnico 6m  ·  tabla _Medidas
+Bajas con contacto técnico 6m =
+CALCULATE ( [Bajas], base_flujos_desercion[contacto_tecnico_6m] = 1 )
+
+-- % Contacto técnico 6m  ·  tabla _Medidas
+% Contacto técnico 6m =
+DIVIDE ( [Bajas con contacto técnico 6m], [Bajas] )
+
+-- % Visita técnica 6m  ·  tabla _Medidas
+% Visita técnica 6m =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[visita_tecnica_6m] = 1 ), [Bajas] )
+
+-- % Reincidencia técnica  ·  tabla _Medidas
+% Reincidencia técnica =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[reincidencia_tecnica] = 1 ), [Bajas] )
+
+-- % Contacto facturación 6m  ·  tabla _Medidas
+% Contacto facturación 6m =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[contacto_facturacion_6m] = 1 ), [Bajas] )
+
+-- % Pidió traslado 6m  ·  tabla _Medidas
+% Pidió traslado 6m =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[contacto_traslado_6m] = 1 ), [Bajas] )
+
+-- % Aumento factura  ·  tabla _Medidas
+% Aumento factura =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[aumento_factura] = 1 ), [Bajas] )
+
+-- % Caída de uso  ·  tabla _Medidas
+% Caída de uso =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[caida_uso_fuerte] = 1 ), [Bajas] )
+
+-- Bajas con alguna señal  ·  tabla _Medidas
+Bajas con alguna señal =
+CALCULATE ( [Bajas], base_flujos_desercion[con_alguna_senal] = 1 )
+
+-- % Alguna señal previa  ·  tabla _Medidas
+% Alguna señal previa =
+DIVIDE ( [Bajas con alguna señal], [Bajas] )
+
+-- Bajas no controlables con señal técnica  ·  tabla _Medidas
+Bajas no controlables con señal técnica =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] <> "Controlable", FILTER ( base_flujos_desercion, base_flujos_desercion[contacto_tecnico_6m] = 1 || base_flujos_desercion[visita_tecnica_6m] = 1 ) )
+
+-- % No controlables con señal técnica  ·  tabla _Medidas
+% No controlables con señal técnica =
+DIVIDE ( [Bajas no controlables con señal técnica], CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] <> "Controlable" ) )
+
+-- Mudanzas que pidieron traslado  ·  tabla _Medidas
+Mudanzas que pidieron traslado =
+CALCULATE ( [Bajas], base_flujos_desercion[motivo_raiz] = "Mudanza / Domicilio", base_flujos_desercion[contacto_traslado_6m] = 1 )
+
+-- % Mudanzas que pidieron traslado  ·  tabla _Medidas
+% Mudanzas que pidieron traslado =
+DIVIDE ( [Mudanzas que pidieron traslado], CALCULATE ( [Bajas], base_flujos_desercion[motivo_raiz] = "Mudanza / Domicilio" ) )
+
+-- ARPU neto 3m  ·  tabla _Medidas
+ARPU neto 3m =
+AVERAGE ( base_flujos_desercion[arpu_neto_3m] )
+
+-- Antigüedad mediana (meses)  ·  tabla _Medidas
+Antigüedad mediana (meses) =
+MEDIAN ( base_flujos_desercion[meses_antiguedad_a_baja] )
+
+-- Megas contratadas mediana  ·  tabla _Medidas
+Megas contratadas mediana =
+MEDIAN ( base_flujos_desercion[megas_contratadas] )
+
+-- % del motivo raíz  ·  tabla _Medidas
+% del motivo raíz =
+DIVIDE ( [Bajas], CALCULATE ( [Bajas], REMOVEFILTERS ( base_flujos_desercion[MOTIVO_TERMINACION] ) ) )
+
+-- Etiqueta bajas y %  ·  tabla _Medidas
+Etiqueta bajas y % =
+FORMAT ( [Bajas], "#,##0" ) & " (" & FORMAT ( [% del total], "0.0%" ) & ")"
+
+-- Color tipo motivo  ·  tabla _Medidas
+Color tipo motivo =
+SWITCH ( SELECTEDVALUE ( base_flujos_desercion[tipo_motivo] ), "Controlable", "#783E80", "No controlable", "#C98FD4", "#BFC1C2" )
+
+-- % del mes  ·  tabla _Medidas
+% del mes =
+DIVIDE ( [Bajas], CALCULATE ( [Bajas], ALLSELECTED ( base_flujos_desercion[motivo_raiz] ), ALLSELECTED ( base_flujos_desercion[MOTIVO_TERMINACION] ) ) )
+
+-- Fecha corte flujos  ·  tabla _Medidas
+Fecha corte flujos =
+CALCULATE ( MAX ( base_flujos_desercion[FECHA_PROCESO_RAIZ_BAJA] ), REMOVEFILTERS ( ) )
+
+-- Corte flujos texto  ·  tabla _Medidas
+Corte flujos texto =
+"Al " & FORMAT ( [Fecha corte flujos], "dd/mm/yyyy" )
+
+-- Flujos acumulados  ·  tabla _Medidas
+Flujos acumulados =
+VAR d = MAX ( 'Calendar'[DayNro] ) VAR f = MIN ( 'Calendar'[Date] ) RETURN IF ( f > [Fecha corte flujos], BLANK ( ), CALCULATE ( [Bajas], 'Calendar'[DayNro] <= d ) )
+
+-- Flujos mes actual  ·  tabla _Medidas
+Flujos mes actual =
+VAR L = [Fecha corte flujos] RETURN CALCULATE ( [Bajas], DATESBETWEEN ( 'Calendar'[Date], DATE ( YEAR ( L ), MONTH ( L ), 1 ), L ) )
+
+-- Flujos mes anterior mismo día  ·  tabla _Medidas
+Flujos mes anterior mismo día =
+VAR L = [Fecha corte flujos] RETURN CALCULATE ( [Bajas], DATESBETWEEN ( 'Calendar'[Date], DATE ( YEAR ( L ), MONTH ( L ) - 1, 1 ), EDATE ( L, -1 ) ) )
+
+-- Var % vs mes anterior  ·  tabla _Medidas
+Var % vs mes anterior =
+DIVIDE ( [Flujos mes actual] - [Flujos mes anterior mismo día], [Flujos mes anterior mismo día] )
+
+-- Promedio 3 meses mismo día  ·  tabla _Medidas
+Promedio 3 meses mismo día =
+VAR L = [Fecha corte flujos] RETURN AVERAGEX ( GENERATESERIES ( 1, 3 ), CALCULATE ( [Bajas], DATESBETWEEN ( 'Calendar'[Date], DATE ( YEAR ( L ), MONTH ( L ) - [Value], 1 ), EDATE ( L, - [Value] ) ) ) )
+
+-- Var % vs promedio 3 meses  ·  tabla _Medidas
+Var % vs promedio 3 meses =
+DIVIDE ( [Flujos mes actual] - [Promedio 3 meses mismo día], [Promedio 3 meses mismo día] )
+
+-- Facturación mensual perdida  ·  tabla _Medidas
+Facturación mensual perdida =
+SUM ( base_flujos_desercion[arpu_neto_3m] )
+
+-- Bajas controlables con señal previa  ·  tabla _Medidas
+Bajas controlables con señal previa =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Controlable", base_flujos_desercion[con_alguna_senal] = 1 )
+
+-- Bajas controlables sin gestión retención  ·  tabla _Medidas
+Bajas controlables sin gestión retención =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Controlable", base_flujos_desercion[tuvo_ticket_retencion] = 0 )
+
+-- Bajas tempranas  ·  tabla _Medidas
+Bajas tempranas =
+CALCULATE ( [Bajas], base_flujos_desercion[meses_antiguedad_a_baja] < 12 )
+
+-- Etiqueta controlables  ·  tabla _Medidas
+Etiqueta controlables =
+FORMAT ( [Bajas controlables], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Bajas controlables], [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta controlables con señal  ·  tabla _Medidas
+Etiqueta controlables con señal =
+FORMAT ( [Bajas controlables con señal previa], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Bajas controlables con señal previa], [Bajas controlables] ), "0%", "es-EC" )
+
+-- Etiqueta controlables sin gestión  ·  tabla _Medidas
+Etiqueta controlables sin gestión =
+FORMAT ( [Bajas controlables sin gestión retención], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Bajas controlables sin gestión retención], [Bajas controlables] ), "0%", "es-EC" )
+
+-- Etiqueta bajas tempranas  ·  tabla _Medidas
+Etiqueta bajas tempranas =
+FORMAT ( [Bajas tempranas], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Bajas tempranas], [Bajas] ), "0%", "es-EC" )
+
+-- Ctrl con contacto técnico  ·  tabla _Medidas
+Ctrl con contacto técnico =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Controlable", base_flujos_desercion[contacto_tecnico_6m] = 1 )
+
+-- Ctrl con visita técnica  ·  tabla _Medidas
+Ctrl con visita técnica =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Controlable", base_flujos_desercion[visita_tecnica_6m] = 1 )
+
+-- Ctrl con contacto facturación  ·  tabla _Medidas
+Ctrl con contacto facturación =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Controlable", base_flujos_desercion[contacto_facturacion_6m] = 1 )
+
+-- Ctrl con aumento factura  ·  tabla _Medidas
+Ctrl con aumento factura =
+CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Controlable", base_flujos_desercion[aumento_factura] = 1 )
+
+-- % señal entre controlables  ·  tabla _Medidas
+% señal entre controlables =
+DIVIDE ( [Bajas controlables con señal previa], [Bajas controlables] )
+
+-- Tempranas con contacto técnico  ·  tabla _Medidas
+Tempranas con contacto técnico =
+CALCULATE ( [Bajas tempranas], base_flujos_desercion[contacto_tecnico_6m] = 1 )
+
+-- Tempranas con visita técnica  ·  tabla _Medidas
+Tempranas con visita técnica =
+CALCULATE ( [Bajas tempranas], base_flujos_desercion[visita_tecnica_6m] = 1 )
+
+-- Tempranas con contacto facturación  ·  tabla _Medidas
+Tempranas con contacto facturación =
+CALCULATE ( [Bajas tempranas], base_flujos_desercion[contacto_facturacion_6m] = 1 )
+
+-- Tempranas con aumento factura  ·  tabla _Medidas
+Tempranas con aumento factura =
+CALCULATE ( [Bajas tempranas], base_flujos_desercion[aumento_factura] = 1 )
+
+-- Tempranas con señal previa  ·  tabla _Medidas
+Tempranas con señal previa =
+CALCULATE ( [Bajas tempranas], base_flujos_desercion[con_alguna_senal] = 1 )
+
+-- % tempranas con señal  ·  tabla _Medidas
+% tempranas con señal =
+DIVIDE ( [Tempranas con señal previa], [Bajas tempranas] )
+
+-- Bajas con señal técnica  ·  tabla _Medidas
+Bajas con señal técnica =
+CALCULATE ( [Bajas], FILTER ( ALL ( base_flujos_desercion[contacto_tecnico_6m], base_flujos_desercion[visita_tecnica_6m] ), base_flujos_desercion[contacto_tecnico_6m] = 1 || base_flujos_desercion[visita_tecnica_6m] = 1 ) )
+
+-- % señal técnica  ·  tabla _Medidas
+% señal técnica =
+DIVIDE ( [Bajas con señal técnica], [Bajas] )
+
+-- % señal técnica promedio  ·  tabla _Medidas
+% señal técnica promedio =
+CALCULATE ( [% señal técnica], ALLSELECTED ( base_flujos_desercion[motivo_raiz] ), ALLSELECTED ( base_flujos_desercion[MOTIVO_TERMINACION] ), ALLSELECTED ( base_flujos_desercion[tipo_motivo] ) )
+
+-- Índice señal técnica  ·  tabla _Medidas
+Índice señal técnica =
+DIVIDE ( [% señal técnica], [% señal técnica promedio] )
+
+-- Bajas con señal facturación  ·  tabla _Medidas
+Bajas con señal facturación =
+CALCULATE ( [Bajas], FILTER ( ALL ( base_flujos_desercion[contacto_facturacion_6m], base_flujos_desercion[aumento_factura] ), base_flujos_desercion[contacto_facturacion_6m] = 1 || base_flujos_desercion[aumento_factura] = 1 ) )
+
+-- % señal facturación  ·  tabla _Medidas
+% señal facturación =
+DIVIDE ( [Bajas con señal facturación], [Bajas] )
+
+-- Índice señal facturación  ·  tabla _Medidas
+Índice señal facturación =
+DIVIDE ( [% señal facturación], CALCULATE ( [% señal facturación], ALLSELECTED ( base_flujos_desercion[motivo_raiz] ), ALLSELECTED ( base_flujos_desercion[MOTIVO_TERMINACION] ), ALLSELECTED ( base_flujos_desercion[tipo_motivo] ) ) )
+
+-- Índice traslado  ·  tabla _Medidas
+Índice traslado =
+DIVIDE ( [% Pidió traslado 6m], CALCULATE ( [% Pidió traslado 6m], ALLSELECTED ( base_flujos_desercion[motivo_raiz] ), ALLSELECTED ( base_flujos_desercion[MOTIVO_TERMINACION] ), ALLSELECTED ( base_flujos_desercion[tipo_motivo] ) ) )
+
+-- Índice caída de uso  ·  tabla _Medidas
+Índice caída de uso =
+DIVIDE ( [% Caída de uso], CALCULATE ( [% Caída de uso], ALLSELECTED ( base_flujos_desercion[motivo_raiz] ), ALLSELECTED ( base_flujos_desercion[MOTIVO_TERMINACION] ), ALLSELECTED ( base_flujos_desercion[tipo_motivo] ) ) )
+
+-- Sin información con señal técnica  ·  tabla _Medidas
+Sin información con señal técnica =
+CALCULATE ( [Bajas con señal técnica], base_flujos_desercion[tipo_motivo] = "Sin información" )
+
+-- Etiqueta no ctrl con señal técnica  ·  tabla _Medidas
+Etiqueta no ctrl con señal técnica =
+FORMAT ( [Bajas no controlables con señal técnica], "#,##0", "es-EC" ) & " · " & FORMAT ( [% No controlables con señal técnica], "0%", "es-EC" )
+
+-- Etiqueta sin información con señal técnica  ·  tabla _Medidas
+Etiqueta sin información con señal técnica =
+FORMAT ( [Sin información con señal técnica], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Sin información con señal técnica], CALCULATE ( [Bajas], base_flujos_desercion[tipo_motivo] = "Sin información" ) ), "0%", "es-EC" )
+
+-- % del mes controlables  ·  tabla _Medidas
+% del mes controlables =
+DIVIDE ( [Bajas controlables], CALCULATE ( [Bajas], ALLSELECTED ( base_flujos_desercion[motivo_raiz] ), ALLSELECTED ( base_flujos_desercion[MOTIVO_TERMINACION] ), ALLSELECTED ( base_flujos_desercion[tipo_motivo] ) ) )
+
+-- Etiqueta bajas y % del mes  ·  tabla _Medidas
+Etiqueta bajas y % del mes =
+IF ( ISBLANK ( [Bajas] ), BLANK ( ), FORMAT ( [Bajas], "#,##0", "es-EC" ) & " (" & FORMAT ( DIVIDE ( [Bajas], CALCULATE ( [Bajas], ALLSELECTED ( base_flujos_desercion[segmento_gpon_grupo] ) ) ), "0%", "es-EC" ) & ")" )
+
+-- Agencia del asesor  ·  tabla _Medidas
+Agencia del asesor =
+IF ( NOT ISINSCOPE ( base_flujos_desercion[NOMBRE_USUARIO_CREACION] ) || ISBLANK ( [Bajas] ), BLANK ( ), COALESCE ( LOOKUPVALUE ( Usuarios_flujos[Canal / Agencia], Usuarios_flujos[Usuario creador], SELECTEDVALUE ( base_flujos_desercion[NOMBRE_USUARIO_CREACION] ) ), "Sin asignar" ) )
+
+-- Etiqueta flujos y % total  ·  tabla _Medidas
+Etiqueta flujos y % total =
+IF ( ISBLANK ( [Bajas] ), BLANK ( ), FORMAT ( [Bajas], "#,##0", "es-EC" ) & " · " & FORMAT ( [% del total], "0%", "es-EC" ) )
+
+-- % GPON  ·  tabla _Medidas
+% GPON =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[TECNOLOGIA_ACCESO] = "GPON" ), [Bajas] )
+
+-- % Fibra nativo  ·  tabla _Medidas
+% Fibra nativo =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[segmento_gpon_grupo] = "FIBRA NATIVO" ), [Bajas] )
+
+-- % Migrados  ·  tabla _Medidas
+% Migrados =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[segmento_gpon_grupo] = "MIGRADOS" ), [Bajas] )
+
+-- Etiqueta flujos y % plan  ·  tabla _Medidas
+Etiqueta flujos y % plan =
+IF ( ISBLANK ( [Bajas] ), BLANK ( ), FORMAT ( [Bajas], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Bajas], CALCULATE ( [Bajas], REMOVEFILTERS ( base_flujos_desercion[VARIANTE_PRODUCTO] ) ) ), "0%", "es-EC" ) )
+
+-- Etiqueta pasó por retención  ·  tabla _Medidas
+Etiqueta pasó por retención =
+FORMAT ( [Bajas con ticket retención], "#,##0", "es-EC" ) & " · " & FORMAT ( [% Pasó por retención], "0%", "es-EC" )
+
+-- Flujos no retenidos último ticket  ·  tabla _Medidas
+Flujos no retenidos último ticket =
+CALCULATE ( [Bajas], base_flujos_desercion[resultado_retencion] = "NO" )
+
+-- Flujos retenidos último ticket  ·  tabla _Medidas
+Flujos retenidos último ticket =
+CALCULATE ( [Bajas], base_flujos_desercion[resultado_retencion] IN { "SI", "SI CRM" } )
+
+-- Etiqueta no retenidos  ·  tabla _Medidas
+Etiqueta no retenidos =
+FORMAT ( [Flujos no retenidos último ticket], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Flujos no retenidos último ticket], [Bajas con ticket retención] ), "0%", "es-EC" )
+
+-- Etiqueta retenidos último ticket  ·  tabla _Medidas
+Etiqueta retenidos último ticket =
+FORMAT ( [Flujos retenidos último ticket], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Flujos retenidos último ticket], [Bajas con ticket retención] ), "0%", "es-EC" )
+
+-- Etiqueta retenidos antes  ·  tabla _Medidas
+Etiqueta retenidos antes =
+FORMAT ( [Bajas retenidas antes], "#,##0", "es-EC" ) & " · " & FORMAT ( [% Retenido antes], "0%", "es-EC" )
+
+-- Veces en retención promedio  ·  tabla _Medidas
+Veces en retención promedio =
+CALCULATE ( AVERAGE ( base_flujos_desercion[n_tickets_retencion_6m] ), base_flujos_desercion[tuvo_ticket_retencion] = 1 )
+
+-- % No retenido  ·  tabla _Medidas
+% No retenido =
+DIVIDE ( [Flujos no retenidos último ticket], [Bajas con ticket retención] )
+
+-- % Con 2+ pasos por retención  ·  tabla _Medidas
+% Con 2+ pasos por retención =
+DIVIDE ( CALCULATE ( [Bajas], base_flujos_desercion[n_tickets_retencion_6m] >= 2 ), [Bajas] )
+
+-- Flujos con motivo previo  ·  tabla _Medidas
+Flujos con motivo previo =
+DISTINCTCOUNT ( Motivos_previos[CITEM_ID] )
+
+-- Etiqueta motivo previo  ·  tabla _Medidas
+Etiqueta motivo previo =
+IF ( ISBLANK ( [Flujos con motivo previo] ), BLANK ( ), FORMAT ( [Flujos con motivo previo], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Flujos con motivo previo], [Bajas] ), "0%", "es-EC" ) )
+
+-- Etiqueta con interacción  ·  tabla _Medidas
+Etiqueta con interacción =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[interacciones_6m] > 0 ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta con llamada técnica  ·  tabla _Medidas
+Etiqueta con llamada técnica =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[llamadas_tecnicas_6m] > 0 ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta con visita técnica  ·  tabla _Medidas
+Etiqueta con visita técnica =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[visitas_tecnicas_6m] > 0 ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta reincidencia técnica  ·  tabla _Medidas
+Etiqueta reincidencia técnica =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[reincidencia_tecnica] = 1 ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta finalizados  ·  tabla _Medidas
+Etiqueta finalizados =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[ESTADO_FLUJO] = "FINALIZADO" ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta en proceso  ·  tabla _Medidas
+Etiqueta en proceso =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[ESTADO_FLUJO] <> "FINALIZADO" ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta GPON  ·  tabla _Medidas
+Etiqueta GPON =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[TECNOLOGIA_ACCESO] = "GPON" ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta fibra nativo  ·  tabla _Medidas
+Etiqueta fibra nativo =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[segmento_gpon_grupo] = "FIBRA NATIVO" ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Etiqueta migrados  ·  tabla _Medidas
+Etiqueta migrados =
+VAR n = CALCULATE ( [Bajas], base_flujos_desercion[segmento_gpon_grupo] = "MIGRADOS" ) RETURN FORMAT ( n, "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( n, [Bajas] ), "0%", "es-EC" )
+
+-- Eje máximo motivos previos  ·  tabla _Medidas
+Eje máximo motivos previos =
+MAXX ( ALLSELECTED ( Motivos_previos[Motivo previo] ), [Flujos con motivo previo] ) * 1.35
+
+-- Espacio etiqueta motivos  ·  tabla _Medidas
+Espacio etiqueta motivos =
+IF ( ISBLANK ( [Flujos con motivo previo] ), BLANK ( ), MAXX ( ALLSELECTED ( Motivos_previos[Motivo previo] ), [Flujos con motivo previo] ) * 1.3 )
+
+-- Filtro tendencia  ·  tabla _Medidas
+Filtro tendencia =
+VAR act = [Flujos mes actual]
+VAR ant = [Flujos mes anterior mismo día]
+VAR cat =
+    SWITCH (
+        TRUE ( ),
+        ISBLANK ( ant ), "Sin flujos el mes anterior",
+        act > ant, "Aumentó",
+        act < ant, "Disminuyó",
+        "Sin cambio"
+    )
+RETURN
+    IF ( NOT ISFILTERED ( 'Tendencia flujos'[Tendencia] ) || cat IN VALUES ( 'Tendencia flujos'[Tendencia] ), 1, 0 )
+
+-- Flujos con contacto 30d  ·  tabla _Medidas
+Flujos con contacto 30d =
+DISTINCTCOUNT ( Interacciones_previas[CITEM_ID] )
+
+-- Flujos con contacto en el mes  ·  tabla _Medidas
+Flujos con contacto en el mes =
+CALCULATE ( DISTINCTCOUNT ( Interacciones_previas[CITEM_ID] ), Interacciones_previas[en_mes_del_flujo] = 1 )
+
+-- % Con contacto 30d  ·  tabla _Medidas
+% Con contacto 30d =
+DIVIDE ( [Flujos con contacto 30d], [Bajas] )
+
+-- % Con contacto en el mes  ·  tabla _Medidas
+% Con contacto en el mes =
+DIVIDE ( [Flujos con contacto en el mes], [Bajas] )
+
+-- Interacciones 30d  ·  tabla _Medidas
+Interacciones 30d =
+COUNTROWS ( Interacciones_previas )
+
+-- Interacciones en el mes  ·  tabla _Medidas
+Interacciones en el mes =
+CALCULATE ( [Interacciones 30d], Interacciones_previas[en_mes_del_flujo] = 1 )
+
+-- Etiqueta contacto 30d  ·  tabla _Medidas
+Etiqueta contacto 30d =
+IF ( ISBLANK ( [Bajas] ), BLANK ( ), FORMAT ( [Flujos con contacto 30d] + 0, "#,##0", "es-EC" ) & " · " & FORMAT ( [% Con contacto 30d] + 0, "0%", "es-EC" ) )
+
+-- Etiqueta contacto en el mes  ·  tabla _Medidas
+Etiqueta contacto en el mes =
+IF ( ISBLANK ( [Bajas] ), BLANK ( ), FORMAT ( [Flujos con contacto en el mes] + 0, "#,##0", "es-EC" ) & " · " & FORMAT ( [% Con contacto en el mes] + 0, "0%", "es-EC" ) )
+
+-- Interacciones por flujo contactado 30d  ·  tabla _Medidas
+Interacciones por flujo contactado 30d =
+DIVIDE ( [Interacciones 30d], [Flujos con contacto 30d] )
+
+-- Flujos con contacto (ventana)  ·  tabla _Medidas
+Flujos con contacto (ventana) =
+IF ( SELECTEDVALUE ( 'Ventana contacto'[Ventana], "30 días antes del flujo" ) = "30 días antes del flujo", [Flujos con contacto 30d], [Flujos con contacto en el mes] )
+
+-- Etiqueta motivo contacto  ·  tabla _Medidas
+Etiqueta motivo contacto =
+IF ( ISBLANK ( [Flujos con contacto (ventana)] ), BLANK ( ), FORMAT ( [Flujos con contacto (ventana)], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Flujos con contacto (ventana)], [Bajas] ), "0%", "es-EC" ) )
+
+-- Espacio etiqueta contacto  ·  tabla _Medidas
+Espacio etiqueta contacto =
+IF ( ISBLANK ( [Flujos con contacto (ventana)] ), BLANK ( ), MAXX ( ALLSELECTED ( Interacciones_previas[motivo_interaccion] ), [Flujos con contacto (ventana)] ) * 1.3 )
+
+-- Etiqueta motivo real  ·  tabla _Medidas
+Etiqueta motivo real =
+IF ( ISBLANK ( [Flujos con motivo real] ), BLANK ( ), FORMAT ( [Flujos con motivo real], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Flujos con motivo real], CALCULATE ( [Flujos con motivo real], ALLSELECTED ( Interacciones_previas[motivo_real_flujo] ) ) ), "0%", "es-EC" ) )
+
+-- Espacio etiqueta motivo real  ·  tabla _Medidas
+Espacio etiqueta motivo real =
+IF ( ISBLANK ( [Flujos con motivo real] ), BLANK ( ), MAXX ( ALLSELECTED ( Interacciones_previas[motivo_real_flujo] ), [Flujos con motivo real] ) * 1.3 )
+
+-- Flujos con motivo real  ·  tabla _Medidas
+Flujos con motivo real =
+CALCULATE ( [Flujos con contacto (ventana)], KEEPFILTERS ( NOT ISBLANK ( Interacciones_previas[motivo_real_flujo] ) ) )
+
+-- Interacciones deserción (ventana)  ·  tabla _Medidas
+Interacciones deserción (ventana) =
+VAR v = SELECTEDVALUE ( 'Ventana contacto'[Ventana], "30 días antes del flujo" )
+RETURN
+    CALCULATE (
+        [Interacciones 30d],
+        KEEPFILTERS ( NOT ISBLANK ( Interacciones_previas[motivo_comentario] ) ),
+        KEEPFILTERS ( FILTER ( ALL ( Interacciones_previas[en_mes_del_flujo] ), v = "30 días antes del flujo" || Interacciones_previas[en_mes_del_flujo] = 1 ) )
+    )
+
+-- Cuentas con contacto de deserción  ·  tabla _Medidas
+Cuentas con contacto de deserción =
+COUNTROWS ( Cola_desercion )
+
+-- Clientes en cola  ·  tabla _Medidas
+Clientes en cola =
+CALCULATE ( COUNTROWS ( Cola_desercion ), KEEPFILTERS ( Cola_desercion[estado_cola] IN {"En cola - no retenido", "En cola - sin gestión de retención"} ) )
+
+-- En cola sin gestión  ·  tabla _Medidas
+En cola sin gestión =
+CALCULATE ( COUNTROWS ( Cola_desercion ), KEEPFILTERS ( Cola_desercion[estado_cola] = "En cola - sin gestión de retención" ) )
+
+-- Días promedio en cola  ·  tabla _Medidas
+Días promedio en cola =
+CALCULATE ( AVERAGE ( Cola_desercion[dias_desde_primer_contacto] ), KEEPFILTERS ( Cola_desercion[estado_cola] IN {"En cola - no retenido", "En cola - sin gestión de retención"} ) )
+
+-- Generaron flujo  ·  tabla _Medidas
+Generaron flujo =
+CALCULATE ( COUNTROWS ( Cola_desercion ), KEEPFILTERS ( Cola_desercion[estado_cola] = "Generó flujo" ) )
+
+-- Etiqueta en cola sin gestión  ·  tabla _Medidas
+Etiqueta en cola sin gestión =
+IF ( ISBLANK ( [En cola sin gestión] ), BLANK ( ), FORMAT ( [En cola sin gestión], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [En cola sin gestión], [Clientes en cola] ), "0%", "es-EC" ) )
+
+-- Etiqueta generaron flujo  ·  tabla _Medidas
+Etiqueta generaron flujo =
+IF ( ISBLANK ( [Generaron flujo] ), BLANK ( ), FORMAT ( [Generaron flujo], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Generaron flujo], [Cuentas con contacto de deserción] ), "0%", "es-EC" ) )
+
+-- Etiqueta cola motivo  ·  tabla _Medidas
+Etiqueta cola motivo =
+IF ( ISBLANK ( [Clientes en cola] ), BLANK ( ), FORMAT ( [Clientes en cola], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Clientes en cola], CALCULATE ( [Clientes en cola], ALLSELECTED ( Cola_desercion[motivo_real] ) ) ), "0%", "es-EC" ) )
+
+-- Espacio etiqueta cola motivo  ·  tabla _Medidas
+Espacio etiqueta cola motivo =
+IF ( ISBLANK ( [Clientes en cola] ), BLANK ( ), MAXX ( ALLSELECTED ( Cola_desercion[motivo_real] ), [Clientes en cola] ) * 1.3 )
+
+-- Etiqueta cola días  ·  tabla _Medidas
+Etiqueta cola días =
+IF ( ISBLANK ( [Clientes en cola] ), BLANK ( ), FORMAT ( [Clientes en cola], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Clientes en cola], CALCULATE ( [Clientes en cola], ALLSELECTED ( Cola_desercion[Rango días en cola] ) ) ), "0%", "es-EC" ) )
+
+-- Espacio etiqueta cola días  ·  tabla _Medidas
+Espacio etiqueta cola días =
+IF ( ISBLANK ( [Clientes en cola] ), BLANK ( ), MAXX ( ALLSELECTED ( Cola_desercion[Rango días en cola] ), [Clientes en cola] ) * 1.3 )
+
+-- Etiqueta estado cola  ·  tabla _Medidas
+Etiqueta estado cola =
+IF ( ISBLANK ( [Cuentas con contacto de deserción] ), BLANK ( ), FORMAT ( [Cuentas con contacto de deserción], "#,##0", "es-EC" ) & " · " & FORMAT ( DIVIDE ( [Cuentas con contacto de deserción], CALCULATE ( [Cuentas con contacto de deserción], ALLSELECTED ( Cola_desercion[estado_cola] ) ) ), "0%", "es-EC" ) )
+
+-- Espacio etiqueta estado cola  ·  tabla _Medidas
+Espacio etiqueta estado cola =
+IF ( ISBLANK ( [Cuentas con contacto de deserción] ), BLANK ( ), MAXX ( ALLSELECTED ( Cola_desercion[estado_cola] ), [Cuentas con contacto de deserción] ) * 1.3 )
+
+-- Nota corte cola  ·  tabla _Medidas
+Nota corte cola =
+VAR c = MAX ( Cola_desercion[fecha_corte] )
+VAR ini = DATE ( YEAR ( EDATE ( c, -1 ) ), MONTH ( EDATE ( c, -1 ) ), 24 )
+RETURN "Contactos del " & FORMAT ( ini, "dd/mm" ) & " al " & FORMAT ( c, "dd/mm/yyyy" ) & " (desde el último corte)"

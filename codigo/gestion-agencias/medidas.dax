@@ -1,0 +1,496 @@
+-- Solicitudes Recibidas  ·  tabla _Medidas
+Solicitudes Recibidas =
+COUNTROWS ( dash_agencias_retencion )
+
+-- Solicitudes Retenidas  ·  tabla _Medidas
+Solicitudes Retenidas =
+SUM ( dash_agencias_retencion[retenido] )
+
+-- Solicitudes No Retenidas  ·  tabla _Medidas
+Solicitudes No Retenidas =
+[Solicitudes Recibidas] - [Solicitudes Retenidas]
+
+-- Tasa de Retención  ·  tabla _Medidas
+Tasa de Retención =
+DIVIDE ( [Solicitudes Retenidas], [Solicitudes Recibidas] )
+
+-- Tasa de Retención Mes Anterior  ·  tabla _Medidas
+Tasa de Retención Mes Anterior =
+VAR _ult = [Última Fecha con Datos]
+VAR _minF = MIN ( Calendar[Date] )
+VAR _maxF = MIN ( MAX ( Calendar[Date] ), _ult )
+VAR _dias = COUNTROWS ( FILTER ( Calendar, Calendar[Date] <= _maxF ) )
+VAR _mesCompleto = _dias = DAY ( EOMONTH ( _minF, 0 ) )
+VAR _finMA = EOMONTH ( _minF, -1 )
+VAR _fin =
+    IF ( _mesCompleto, _finMA, MIN ( DATE ( YEAR ( _minF ), MONTH ( _minF ) - 1, DAY ( _maxF ) ), _finMA ) )
+VAR _ini =
+    IF ( _dias = 1, _fin, EOMONTH ( _minF, -2 ) + 1 )
+RETURN
+    IF (
+        _minF <= _ult && NOT ISBLANK ( [Solicitudes Recibidas] ),
+        CALCULATE ( [Tasa de Retención], ALL ( Calendar ), Calendar[Date] >= _ini && Calendar[Date] <= _fin )
+    )
+
+-- Var. Tasa Retención vs Mes Anterior (pp)  ·  tabla _Medidas
+Var. Tasa Retención vs Mes Anterior (pp) =
+VAR _ma = [Tasa de Retención Mes Anterior]
+RETURN IF ( NOT ISBLANK ( _ma ), [Tasa de Retención] - _ma )
+
+-- Asesores Activos Retención  ·  tabla _Medidas
+Asesores Activos Retención =
+DISTINCTCOUNT ( dash_agencias_retencion[Asesor] )
+
+-- Retenidas por Asesor  ·  tabla _Medidas
+Retenidas por Asesor =
+DIVIDE ( [Solicitudes Retenidas], [Asesores Activos Retención] )
+
+-- Última Fecha con Datos  ·  tabla _Medidas
+Última Fecha con Datos =
+CALCULATE ( MAX ( dash_agencias_retencion[Fecha] ), ALL ( Calendar ) )
+
+-- Valor Económico Rescatado  ·  tabla _Medidas
+Valor Económico Rescatado =
+SUMX (
+    VALUES ( Calendar[YearMonth] ),
+    [Solicitudes Retenidas] * [ARPU Promedio Retenidas]
+)
+
+-- ARPU Promedio Retenidas  ·  tabla _Medidas
+ARPU Promedio Retenidas =
+CALCULATE ( AVERAGE ( dash_agencias_retencion[arpu_neto_3m] ), dash_agencias_retencion[retenido] = 1 )
+
+-- Total Interacciones  ·  tabla _Medidas
+Total Interacciones =
+COUNTROWS ( dash_agencias_interacciones )
+
+-- Consultas  ·  tabla _Medidas
+Consultas =
+SUM ( dash_agencias_interacciones[es_consulta] )
+
+-- Solicitudes  ·  tabla _Medidas
+Solicitudes =
+SUM ( dash_agencias_interacciones[es_solicitud] )
+
+-- Problemas  ·  tabla _Medidas
+Problemas =
+SUM ( dash_agencias_interacciones[es_problema] )
+
+-- Deserciones  ·  tabla _Medidas
+Deserciones =
+SUM ( dash_agencias_interacciones[es_desercion] )
+
+-- Casos Backoffice  ·  tabla _Medidas
+Casos Backoffice =
+SUM ( dash_agencias_interacciones[es_caso_bo] )
+
+-- % Escalamiento N2  ·  tabla _Medidas
+% Escalamiento N2 =
+DIVIDE ( [Casos Backoffice], [Total Interacciones] + [Casos Backoffice] )
+
+-- FCR  ·  tabla _Medidas
+FCR =
+DIVIDE ( [Ciclos FCR Exitosos], [Ciclos FCR Elegibles] )
+
+-- Total Interacciones Mes Anterior  ·  tabla _Medidas
+Total Interacciones Mes Anterior =
+VAR _actual = [Total Interacciones]
+VAR _ult = CALCULATE ( MAX ( dash_agencias_interacciones[Fecha] ), REMOVEFILTERS () )
+VAR _minF = MIN ( Calendar[Date] )
+VAR _maxF = MIN ( MAX ( Calendar[Date] ), _ult )
+VAR _finMA = EOMONTH ( _minF, -1 )
+VAR _mesCompleto = _maxF = EOMONTH ( _minF, 0 ) && DAY ( _minF ) = 1
+VAR _fin = IF ( _mesCompleto, _finMA, MIN ( EDATE ( _maxF, -1 ), _finMA ) )
+VAR _ini = IF ( _minF = _maxF, _fin, EOMONTH ( _minF, -2 ) + 1 )
+RETURN
+    IF (
+        NOT ISBLANK ( _actual ) && _minF <= _ult,
+        CALCULATE ( [Total Interacciones], REMOVEFILTERS ( Calendar ), DATESBETWEEN ( Calendar[Date], _ini, _fin ) )
+    )
+
+-- Var. Interacciones vs Mes Anterior  ·  tabla _Medidas
+Var. Interacciones vs Mes Anterior =
+VAR _ma = [Total Interacciones Mes Anterior]
+RETURN IF ( NOT ISBLANK ( _ma ), DIVIDE ( [Total Interacciones] - _ma, _ma ) )
+
+-- Ventas Realizadas  ·  tabla _Medidas
+Ventas Realizadas =
+SUM ( dash_agencias_ventas[es_internet] )
+
+-- Última Fecha Ventas  ·  tabla _Medidas
+Última Fecha Ventas =
+CALCULATE ( MAX ( dash_agencias_ventas[Fecha] ), REMOVEFILTERS () )
+
+-- Meta Ventas  ·  tabla _Medidas
+Meta Ventas =
+IF (
+    ISFILTERED ( dash_agencias_ventas[Asesor] ) || ISFILTERED ( dash_agencias_ventas[Punto de venta] ),
+    BLANK (),
+    SUMX (
+        VALUES ( Calendar[YearMonth] ),
+        VAR _ym = Calendar[YearMonth]
+        RETURN CALCULATE ( SUM ( dash_agencias_meta_ventas[meta] ), ALL ( Calendar ), Calendar[YearMonth] = _ym )
+    )
+)
+
+-- Diferencia vs Meta  ·  tabla _Medidas
+Diferencia vs Meta =
+VAR _m = [Meta Ventas]
+RETURN IF ( NOT ISBLANK ( _m ), [Ventas Realizadas] - _m )
+
+-- % Cumplimiento Ventas  ·  tabla _Medidas
+% Cumplimiento Ventas =
+DIVIDE ( [Ventas Realizadas], [Meta Ventas] )
+
+-- Ventas Proyectadas  ·  tabla _Medidas
+Ventas Proyectadas =
+VAR _ult = [Última Fecha Ventas]
+RETURN
+    SUMX (
+        VALUES ( Calendar[YearMonth] ),
+        VAR _corte = MIN ( CALCULATE ( MAX ( Calendar[Date] ) ), _ult )
+        VAR _ini = CALCULATE ( MIN ( Calendar[Date] ), ALL ( Calendar ), VALUES ( Calendar[YearMonth] ) )
+        VAR _v = CALCULATE ( [Ventas Realizadas] )
+        VAR _finMes = EOMONTH ( _ini, 0 )
+        RETURN
+            IF (
+                _ini <= _ult,
+                IF ( _corte >= _finMes, _v, DIVIDE ( _v * DAY ( _finMes ), DAY ( _corte ) ) )
+            )
+    )
+
+-- % Cumplimiento Proyectado  ·  tabla _Medidas
+% Cumplimiento Proyectado =
+DIVIDE ( [Ventas Proyectadas], [Meta Ventas] )
+
+-- Ventas Mes Anterior  ·  tabla _Medidas
+Ventas Mes Anterior =
+VAR _ult = [Última Fecha Ventas]
+VAR _minF = MIN ( Calendar[Date] )
+VAR _maxF = MIN ( MAX ( Calendar[Date] ), _ult )
+VAR _dias = COUNTROWS ( FILTER ( Calendar, Calendar[Date] <= _maxF ) )
+VAR _mesCompleto = _dias = DAY ( EOMONTH ( _minF, 0 ) )
+VAR _finMA = EOMONTH ( _minF, -1 )
+VAR _fin =
+    IF ( _mesCompleto, _finMA, MIN ( DATE ( YEAR ( _minF ), MONTH ( _minF ) - 1, DAY ( _maxF ) ), _finMA ) )
+VAR _ini =
+    IF ( _dias = 1, _fin, EOMONTH ( _minF, -2 ) + 1 )
+RETURN
+    IF (
+        _minF <= _ult && NOT ISBLANK ( [Ventas Realizadas] ),
+        CALCULATE ( [Ventas Realizadas], ALL ( Calendar ), Calendar[Date] >= _ini && Calendar[Date] <= _fin )
+    )
+
+-- Var. Ventas vs Mes Anterior  ·  tabla _Medidas
+Var. Ventas vs Mes Anterior =
+VAR _ma = [Ventas Mes Anterior]
+RETURN IF ( NOT ISBLANK ( _ma ), DIVIDE ( [Ventas Realizadas] - _ma, _ma ) )
+
+-- Valor Vendido  ·  tabla _Medidas
+Valor Vendido =
+SUM ( dash_agencias_ventas[valor_vendido] )
+
+-- Facturación Acumulada  ·  tabla _Medidas
+Facturación Acumulada =
+[Valor Vendido]
+
+-- Asesores con Ventas  ·  tabla _Medidas
+Asesores con Ventas =
+CALCULATE ( DISTINCTCOUNT ( dash_agencias_ventas[Asesor] ), dash_agencias_ventas[es_internet] = 1 )
+
+-- Ventas por Asesor  ·  tabla _Medidas
+Ventas por Asesor =
+DIVIDE ( [Ventas Realizadas], [Asesores con Ventas] )
+
+-- Turnos Atendidos  ·  tabla _Medidas
+Turnos Atendidos =
+SUM ( dash_agencias_tiempos[completado] )
+
+-- Turnos Cancelados  ·  tabla _Medidas
+Turnos Cancelados =
+SUM ( dash_agencias_tiempos[cancelado] )
+
+-- % Turnos Cancelados  ·  tabla _Medidas
+% Turnos Cancelados =
+DIVIDE ( [Turnos Cancelados], [Turnos Atendidos] + [Turnos Cancelados] )
+
+-- Tiempo Promedio Espera (min)  ·  tabla _Medidas
+Tiempo Promedio Espera (min) =
+CALCULATE ( AVERAGE ( dash_agencias_tiempos[espera_min] ), dash_agencias_tiempos[espera_valida] = 1 )
+
+-- Tiempo Promedio Atención Presencial (min)  ·  tabla _Medidas
+Tiempo Promedio Atención Presencial (min) =
+CALCULATE ( AVERAGE ( dash_agencias_tiempos[atencion_min] ), dash_agencias_tiempos[atencion_valida] = 1 )
+
+-- SLA Atención Presencial  ·  tabla _Medidas
+SLA Atención Presencial =
+DIVIDE ( SUM ( dash_agencias_tiempos[dentro_sla] ), SUM ( dash_agencias_tiempos[espera_valida] ) )
+
+-- Última Fecha Turnos  ·  tabla _Medidas
+Última Fecha Turnos =
+CALCULATE ( MAX ( dash_agencias_tiempos[Fecha] ), REMOVEFILTERS () )
+
+-- Agentes con Turnos  ·  tabla _Medidas
+Agentes con Turnos =
+CALCULATE ( DISTINCTCOUNT ( dash_agencias_tiempos[agente] ), dash_agencias_tiempos[completado] = 1 )
+
+-- Turnos por Agente  ·  tabla _Medidas
+Turnos por Agente =
+DIVIDE ( [Turnos Atendidos], [Agentes con Turnos] )
+
+-- Turnos Atendidos Mes Anterior  ·  tabla _Medidas
+Turnos Atendidos Mes Anterior =
+VAR _ult = [Última Fecha Turnos]
+VAR _minF = MIN ( Calendar[Date] )
+VAR _maxF = MIN ( MAX ( Calendar[Date] ), _ult )
+VAR _dias = COUNTROWS ( FILTER ( Calendar, Calendar[Date] <= _maxF ) )
+VAR _mesCompleto = _dias = DAY ( EOMONTH ( _minF, 0 ) )
+VAR _finMA = EOMONTH ( _minF, -1 )
+VAR _fin =
+    IF ( _mesCompleto, _finMA, MIN ( DATE ( YEAR ( _minF ), MONTH ( _minF ) - 1, DAY ( _maxF ) ), _finMA ) )
+VAR _ini =
+    IF ( _dias = 1, _fin, EOMONTH ( _minF, -2 ) + 1 )
+RETURN
+    IF (
+        _minF <= _ult && NOT ISBLANK ( [Turnos Atendidos] ),
+        CALCULATE ( [Turnos Atendidos], ALL ( Calendar ), Calendar[Date] >= _ini && Calendar[Date] <= _fin )
+    )
+
+-- Var. Turnos vs Mes Anterior  ·  tabla _Medidas
+Var. Turnos vs Mes Anterior =
+VAR _ma = [Turnos Atendidos Mes Anterior]
+RETURN IF ( NOT ISBLANK ( _ma ), DIVIDE ( [Turnos Atendidos] - _ma, _ma ) )
+
+-- Ventas CRM  ·  tabla _Medidas
+Ventas CRM =
+SUM ( dash_agencias_interacciones[es_venta] )
+
+-- Tiempo Solución N2 (h)  ·  tabla _Medidas
+Tiempo Solución N2 (h) =
+CALCULATE (
+    AVERAGE ( dash_agencias_tickets_bo[horas_laborables] ),
+    dash_agencias_tickets_bo[es_ticket_bo] = 1,
+    dash_agencias_tickets_bo[terminado] = 1
+)
+
+-- Ciclos FCR Elegibles  ·  tabla _Medidas
+Ciclos FCR Elegibles =
+CALCULATE ( SUM ( dash_agencias_fcr[elegible] ), dash_agencias_fcr[evaluable] = 1 )
+
+-- Ciclos FCR Sí  ·  tabla _Medidas
+Ciclos FCR Sí =
+CALCULATE ( SUM ( dash_agencias_fcr[elegible] ), dash_agencias_fcr[evaluable] = 1, dash_agencias_fcr[fcr_si] = 1 )
+
+-- Ciclos FCR Exitosos  ·  tabla _Medidas
+Ciclos FCR Exitosos =
+CALCULATE ( SUM ( dash_agencias_fcr[elegible] ), dash_agencias_fcr[evaluable] = 1, dash_agencias_fcr[fcr_si] = 1, dash_agencias_fcr[con_recontacto] = 0 )
+
+-- FCR Máximo  ·  tabla _Medidas
+FCR Máximo =
+DIVIDE ( [Ciclos FCR Sí], [Ciclos FCR Elegibles] )
+
+-- % Recontacto 72h  ·  tabla _Medidas
+% Recontacto 72h =
+DIVIDE ( CALCULATE ( SUM ( dash_agencias_fcr[elegible] ), dash_agencias_fcr[evaluable] = 1, dash_agencias_fcr[con_recontacto] = 1 ), [Ciclos FCR Elegibles] )
+
+-- Eje Ventas Max  ·  tabla _Medidas
+Eje Ventas Max =
+1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), MAX ( [Ventas Realizadas], [Meta Ventas] ) )
+
+-- Eje Ventas % Min  ·  tabla _Medidas
+Eje Ventas % Min =
+-1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), [% Cumplimiento Ventas] )
+
+-- Eje Ventas % Max  ·  tabla _Medidas
+Eje Ventas % Max =
+1.15 * MAXX ( VALUES ( Calendar[YearMonth] ), [% Cumplimiento Ventas] )
+
+-- Eje Retención Max  ·  tabla _Medidas
+Eje Retención Max =
+1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), MAX ( [Solicitudes Recibidas], [Solicitudes Retenidas] ) )
+
+-- Eje Retención % Min  ·  tabla _Medidas
+Eje Retención % Min =
+-1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), [Tasa de Retención] )
+
+-- Eje Retención % Max  ·  tabla _Medidas
+Eje Retención % Max =
+1.15 * MAXX ( VALUES ( Calendar[YearMonth] ), [Tasa de Retención] )
+
+-- Eje Tiempos Max  ·  tabla _Medidas
+Eje Tiempos Max =
+1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), MAX ( [Tiempo Promedio Espera (min)], [Tiempo Promedio Atención Presencial (min)] ) )
+
+-- Eje Tiempos % Min  ·  tabla _Medidas
+Eje Tiempos % Min =
+-1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), [SLA Atención Presencial] )
+
+-- Eje Tiempos % Max  ·  tabla _Medidas
+Eje Tiempos % Max =
+1.15 * MAXX ( VALUES ( Calendar[YearMonth] ), [SLA Atención Presencial] )
+
+-- Promedio Ventas 3M  ·  tabla _Medidas
+Promedio Ventas 3M =
+VAR _ult = [Última Fecha Ventas]
+VAR _ini = EOMONTH ( _ult, -4 ) + 1
+VAR _fin = EOMONTH ( _ult, -1 )
+VAR _meses =
+    CALCULATETABLE ( VALUES ( Calendar[YearMonth] ), REMOVEFILTERS ( Calendar ), DATESBETWEEN ( Calendar[Date], _ini, _fin ) )
+VAR _prom =
+    AVERAGEX (
+        _meses,
+        VAR _m = Calendar[YearMonth]
+        VAR _v = CALCULATE ( [Ventas Realizadas], REMOVEFILTERS ( Calendar ), Calendar[YearMonth] = _m )
+        RETURN IF ( _v > 0, _v )
+    )
+RETURN
+    IF ( ISINSCOPE ( dash_agencias_ventas[Asesor] ), ROUND ( _prom, 0 ) )
+
+-- Rango Ventas 3M  ·  tabla _Medidas
+Rango Ventas 3M =
+VAR _p = [Promedio Ventas 3M]
+VAR _r = ROUND ( _p, 0 )
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( _p ), BLANK (),
+        _r <= 2, "0-2",
+        _r <= 6, "3-6",
+        _r <= 11, "7-11",
+        _r <= 20, "12-20",
+        "Más de 20"
+    )
+
+-- Título Promedio 3M  ·  tabla _Medidas
+Título Promedio 3M =
+VAR _ult = [Última Fecha Ventas]
+VAR _m = MONTH ( _ult )
+VAR _txt = "EneFebMarAbrMayJunJulAgoSepOctNovDic"
+VAR _m3 = MOD ( _m - 4, 12 ) + 1
+VAR _m2 = MOD ( _m - 3, 12 ) + 1
+VAR _m1 = MOD ( _m - 2, 12 ) + 1
+RETURN
+    "Ventas mensuales por ejecutivo · Prom. 3 meses = promedio de "
+        & MID ( _txt, ( _m3 - 1 ) * 3 + 1, 3 ) & ", "
+        & MID ( _txt, ( _m2 - 1 ) * 3 + 1, 3 ) & " y "
+        & MID ( _txt, ( _m1 - 1 ) * 3 + 1, 3 )
+
+-- Ventas por Columna  ·  tabla _Medidas
+Ventas por Columna =
+VAR _col = SELECTEDVALUE ( dim_columnas_ventas[Columna] )
+VAR _mes = SELECTEDVALUE ( dim_columnas_ventas[MesNro] )
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( _col ), BLANK (),
+        _col = "Promedio", [Promedio Ventas 3M],
+        _col = "Rango", [Rango Ventas 3M],
+        CALCULATE ( [Ventas Realizadas], Calendar[MonthNo] = _mes )
+    )
+
+-- Última Fecha Interacciones  ·  tabla _Medidas
+Última Fecha Interacciones =
+CALCULATE ( MAX ( dash_agencias_interacciones[Fecha] ), REMOVEFILTERS () )
+
+-- Última Fecha Retención  ·  tabla _Medidas
+Última Fecha Retención =
+CALCULATE ( MAX ( dash_agencias_retencion[Fecha] ), REMOVEFILTERS () )
+
+-- Encuestas CSAT  ·  tabla _Medidas
+Encuestas CSAT =
+CALCULATE ( COUNTROWS ( dash_satisfaccion_cliente ), dash_satisfaccion_cliente[csat_valido] = 1 )
+
+-- Clientes Satisfechos  ·  tabla _Medidas
+Clientes Satisfechos =
+CALCULATE ( SUM ( dash_satisfaccion_cliente[csat_satisfecho] ), dash_satisfaccion_cliente[csat_valido] = 1 )
+
+-- Clientes Neutros  ·  tabla _Medidas
+Clientes Neutros =
+CALCULATE ( SUM ( dash_satisfaccion_cliente[csat_neutro] ), dash_satisfaccion_cliente[csat_valido] = 1 )
+
+-- Clientes Insatisfechos  ·  tabla _Medidas
+Clientes Insatisfechos =
+CALCULATE ( SUM ( dash_satisfaccion_cliente[csat_insatisfecho] ), dash_satisfaccion_cliente[csat_valido] = 1 )
+
+-- CSAT  ·  tabla _Medidas
+CSAT =
+DIVIDE ( [Clientes Satisfechos], [Encuestas CSAT] )
+
+-- % Insatisfechos  ·  tabla _Medidas
+% Insatisfechos =
+DIVIDE ( [Clientes Insatisfechos], [Encuestas CSAT] )
+
+-- Nota Promedio CSAT  ·  tabla _Medidas
+Nota Promedio CSAT =
+CALCULATE ( AVERAGE ( dash_satisfaccion_cliente[csat_score] ), dash_satisfaccion_cliente[csat_valido] = 1 )
+
+-- Última Fecha CSAT  ·  tabla _Medidas
+Última Fecha CSAT =
+CALCULATE ( MAX ( dash_satisfaccion_cliente[Fecha] ), REMOVEFILTERS () )
+
+-- Eje CSAT Max  ·  tabla _Medidas
+Eje CSAT Max =
+1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), [Encuestas CSAT] )
+
+-- Eje CSAT % Min  ·  tabla _Medidas
+Eje CSAT % Min =
+-1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), MAX ( [CSAT], [CSAT Ponderado] ) )
+
+-- Eje CSAT % Max  ·  tabla _Medidas
+Eje CSAT % Max =
+1.15 * MAXX ( VALUES ( Calendar[YearMonth] ), MAX ( [CSAT], [CSAT Ponderado] ) )
+
+-- Transacciones CSAT  ·  tabla _Medidas
+Transacciones CSAT =
+SUMX (
+    SUMMARIZE (
+        dash_satisfaccion_cliente,
+        dash_satisfaccion_cliente[anio],
+        dash_satisfaccion_cliente[mes_num],
+        dash_satisfaccion_cliente[etapa_journey],
+        dash_satisfaccion_cliente[subtipo_evento]
+    ),
+    CALCULATE ( MAX ( dash_satisfaccion_cliente[transacciones_finales] ) )
+)
+
+-- CSAT Ponderado  ·  tabla _Medidas
+CSAT Ponderado =
+VAR TablaFlujos =
+    SUMMARIZE (
+        dash_satisfaccion_cliente,
+        dash_satisfaccion_cliente[anio],
+        dash_satisfaccion_cliente[mes_num],
+        dash_satisfaccion_cliente[etapa_journey],
+        dash_satisfaccion_cliente[subtipo_evento]
+    )
+VAR SumaPonderada =
+    SUMX (
+        TablaFlujos,
+        CALCULATE ( MAX ( dash_satisfaccion_cliente[transacciones_finales] ) ) * CALCULATE ( [CSAT] )
+    )
+RETURN
+    DIVIDE ( SumaPonderada, [Transacciones CSAT] )
+
+-- Clientes Únicos Agencia  ·  tabla _Medidas
+Clientes Únicos Agencia =
+CALCULATE ( DISTINCTCOUNT ( dash_agencias_interacciones[Cuenta] ), NOT ISBLANK ( dash_agencias_interacciones[Cuenta] ) )
+
+-- Clientes con Contacto Previo  ·  tabla _Medidas
+Clientes con Contacto Previo =
+CALCULATE ( DISTINCTCOUNT ( dash_agencias_interacciones[Cuenta] ), dash_agencias_interacciones[contacto_previo_30d] = 1 )
+
+-- % Clientes con Contacto Previo  ·  tabla _Medidas
+% Clientes con Contacto Previo =
+DIVIDE ( [Clientes con Contacto Previo], [Clientes Únicos Agencia] )
+
+-- Días Promedio desde Contacto Previo  ·  tabla _Medidas
+Días Promedio desde Contacto Previo =
+CALCULATE ( AVERAGE ( dash_agencias_interacciones[dias_contacto_previo] ), dash_agencias_interacciones[contacto_previo_30d] = 1 )
+
+-- Clientes sin Contacto Previo  ·  tabla _Medidas
+Clientes sin Contacto Previo =
+[Clientes Únicos Agencia] - [Clientes con Contacto Previo]
+
+-- Eje Contacto Max  ·  tabla _Medidas
+Eje Contacto Max =
+1.6 * MAXX ( VALUES ( Calendar[YearMonth] ), [Clientes Únicos Agencia] )
